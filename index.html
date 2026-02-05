@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marfim IA Pro - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --marfim-dark: #0a192f; --marfim-accent: #c5a059; --bg-light: #f4f7f9; }
+        body { background-color: var(--bg-light); font-family: 'Inter', sans-serif; color: #333; }
+        .sidebar { background: var(--marfim-dark); color: white; min-height: 100vh; padding: 30px 20px; }
+        .card-pro { border: none; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); background: white; }
+        .btn-marfim { background: var(--marfim-accent); color: white; border: none; font-weight: 600; }
+        .btn-marfim:hover { background: #b08d4a; color: white; }
+        .product-item { cursor: pointer; border-left: 5px solid transparent; transition: 0.2s; background: rgba(255,255,255,0.05); margin-bottom: 10px; border-radius: 8px; }
+        .product-item:hover { background: rgba(255,255,255,0.1); border-left-color: var(--marfim-accent); }
+        .badge-unit { font-size: 0.75rem; background: rgba(197, 160, 89, 0.2); color: var(--marfim-accent); padding: 4px 8px; border-radius: 5px; }
+        #loaderIA { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3 sidebar">
+                <h3 class="fw-bold mb-4 text-center">🏭 Marfim IA</h3>
+                <hr class="opacity-25 mb-4">
+                <div class="mb-4">
+                    <label class="form-label small opacity-75">Pesquisar no Índice</label>
+                    <div class="input-group">
+                        <input type="text" id="inputBusca" class="form-control border-0" placeholder="Ex: ACETATO" style="height: 50px;">
+                        <button class="btn btn-marfim" onclick="buscarItem()">🔍</button>
+                    </div>
+                </div>
+                <div id="listaResultados" class="pe-2" style="max-height: 65vh; overflow-y: auto;">
+                    </div>
+            </div>
+
+            <div class="col-md-9 p-5">
+                <div id="welcomeScreen" class="text-center py-5">
+                    <div class="display-1 text-muted mb-4 opacity-25">📦</div>
+                    <h3 class="text-secondary">Pronto para Auditar</h3>
+                    <p class="text-muted">Busque e selecione um item para iniciar a análise estratégica de estoque.</p>
+                </div>
+
+                <div id="analysisPanel" style="display: none;">
+                    <div class="card card-pro p-4 mb-4 border-bottom border-5 border-warning">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h1 id="activeItemName" class="fw-bold mb-1">--</h1>
+                                <p id="activeItemUnit" class="text-muted text-uppercase small ls-1">--</p>
+                            </div>
+                            <div class="text-end">
+                                <span class="display-6 fw-bold text-primary" id="activeItemStock">--</span>
+                                <div class="text-muted small" id="labelSaldo">SALDO EM ESTOQUE</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card card-pro p-4">
+                        <div class="d-flex align-items-center mb-4 border-bottom pb-3">
+                            <h4 class="fw-bold m-0">🤖 Análise da Inteligência Artificial</h4>
+                            <div class="spinner-border spinner-border-sm ms-3 text-warning" id="loaderIA"></div>
+                        </div>
+                        <div id="iaResponse" class="fs-5 lh-lg" style="white-space: pre-wrap; color: #444;">
+                            Aguardando comando...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function buscarItem() {
+            const item = document.getElementById('inputBusca').value;
+            const res = await fetch('/buscar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({item})
+            });
+            const dados = await res.json();
+            
+            let html = '';
+            dados.forEach(d => {
+                html += `
+                <div onclick="analisarIA('${d.Item}', '${d['Saldo Atual']}', '${d.Unidade}')" class="p-3 product-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-truncate me-2" style="max-width: 180px;">${d.Item}</div>
+                        <span class="badge-unit">${d.Unidade}</span>
+                    </div>
+                    <div class="small opacity-50 mt-1">Saldo: ${d['Saldo Atual']}</div>
+                </div>`;
+            });
+            document.getElementById('listaResultados').innerHTML = html;
+        }
+
+        async function analisarIA(item, saldo, unidade) {
+            // UI Setup
+            document.getElementById('welcomeScreen').style.display = 'none';
+            document.getElementById('analysisPanel').style.display = 'block';
+            document.getElementById('activeItemName').innerText = item;
+            document.getElementById('activeItemUnit').innerText = `Unidade de Medida: ${unidade}`;
+            document.getElementById('activeItemStock').innerText = saldo;
+            document.getElementById('iaResponse').innerHTML = '<span class="text-muted">Recuperando histórico e processando com Llama 3.3...</span>';
+            document.getElementById('loaderIA').style.display = 'inline-block';
+
+            const res = await fetch('/analisar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({item, saldo})
+            });
+            const data = await res.json();
+            
+            document.getElementById('loaderIA').style.display = 'none';
+            document.getElementById('iaResponse').innerText = data.resposta;
+        }
+    </script>
+</body>
+</html>
