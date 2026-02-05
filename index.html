@@ -1,69 +1,792 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marfim IA Pro - Dashboard</title>
+    <title>Marfim IA - Estoque Inteligente</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --marfim-dark: #0a192f; --marfim-accent: #c5a059; --bg-light: #f4f7f9; }
-        body { background-color: var(--bg-light); font-family: 'Inter', sans-serif; color: #333; }
-        .sidebar { background: var(--marfim-dark); color: white; min-height: 100vh; padding: 30px 20px; }
-        .card-pro { border: none; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); background: white; }
-        .btn-marfim { background: var(--marfim-accent); color: white; border: none; font-weight: 600; }
-        .btn-marfim:hover { background: #b08d4a; color: white; }
-        .product-item { cursor: pointer; border-left: 5px solid transparent; transition: 0.2s; background: rgba(255,255,255,0.05); margin-bottom: 10px; border-radius: 8px; }
-        .product-item:hover { background: rgba(255,255,255,0.1); border-left-color: var(--marfim-accent); }
-        .badge-unit { font-size: 0.75rem; background: rgba(197, 160, 89, 0.2); color: var(--marfim-accent); padding: 4px 8px; border-radius: 5px; }
-        #loaderIA { display: none; }
+        :root {
+            --primary: #0a192f;
+            --secondary: #1a365d;
+            --accent: #c5a059;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #22c55e;
+            --info: #3b82f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%);
+            min-height: 100vh;
+            padding: 0;
+            position: fixed;
+            width: 250px;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .sidebar-header h4 {
+            color: var(--accent);
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .sidebar-header small {
+            color: rgba(255,255,255,0.6);
+        }
+
+        .nav-menu {
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            padding: 12px 25px;
+            color: rgba(255,255,255,0.8);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(197, 160, 89, 0.2);
+            color: var(--accent);
+            border-left: 3px solid var(--accent);
+        }
+
+        .nav-item i {
+            font-size: 1.2rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 250px;
+            padding: 20px 30px;
+        }
+
+        /* Header */
+        .page-header {
+            background: white;
+            padding: 20px 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-header h2 {
+            margin: 0;
+            color: var(--primary);
+        }
+
+        /* KPI Cards */
+        .kpi-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.3s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .kpi-card .icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .kpi-card .value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .kpi-card .label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        /* Cards */
+        .card-custom {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: none;
+        }
+
+        .card-custom .card-header {
+            background: transparent;
+            border-bottom: 1px solid #eee;
+            padding: 15px 20px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* Tables */
+        .table-custom {
+            margin: 0;
+        }
+
+        .table-custom th {
+            background: #f8f9fa;
+            color: var(--primary);
+            font-weight: 600;
+            border: none;
+            padding: 12px 15px;
+        }
+
+        .table-custom td {
+            padding: 12px 15px;
+            vertical-align: middle;
+            border-color: #f0f0f0;
+        }
+
+        .table-custom tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* Badges */
+        .badge-critico { background: var(--danger); }
+        .badge-urgente { background: var(--warning); }
+        .badge-atencao { background: #eab308; }
+        .badge-normal { background: var(--success); }
+
+        /* Search */
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            padding-left: 45px;
+            border-radius: 25px;
+            border: 2px solid #e0e0e0;
+            height: 45px;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.2);
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+
+        /* Buttons */
+        .btn-primary-custom {
+            background: var(--accent);
+            border: none;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .btn-primary-custom:hover {
+            background: #b8933d;
+            color: var(--primary);
+        }
+
+        /* Chat */
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .chat-message {
+            max-width: 80%;
+            padding: 12px 18px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+
+        .chat-user {
+            background: var(--accent);
+            color: var(--primary);
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+
+        .chat-bot {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Alerts */
+        .alert-card {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .alert-critico {
+            background: #fee2e2;
+            border-left: 4px solid var(--danger);
+        }
+
+        .alert-urgente {
+            background: #fef3c7;
+            border-left: 4px solid var(--warning);
+        }
+
+        .alert-atencao {
+            background: #fef9c3;
+            border-left: 4px solid #eab308;
+        }
+
+        /* Page sections */
+        .page-section {
+            display: none;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                min-height: auto;
+                position: relative;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-3 sidebar">
-                <h3 class="fw-bold mb-4 text-center">🏭 Marfim IA</h3>
-                <hr class="opacity-25 mb-4">
-                <div class="mb-4">
-                    <label class="form-label small opacity-75">Pesquisar no Índice</label>
-                    <div class="input-group">
-                        <input type="text" id="inputBusca" class="form-control border-0" placeholder="Ex: ACETATO" style="height: 50px;">
-                        <button class="btn btn-marfim" onclick="buscarItem()">🔍</button>
-                    </div>
-                </div>
-                <div id="listaResultados" class="pe-2" style="max-height: 65vh; overflow-y: auto;">
-                    </div>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h4><i class="bi bi-box-seam"></i> MARFIM IA</h4>
+            <small>Estoque Inteligente v2.0</small>
+        </div>
+        <div class="nav-menu">
+            <div class="nav-item active" data-page="dashboard">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </div>
+            <div class="nav-item" data-page="consulta">
+                <i class="bi bi-search"></i> Consulta
+            </div>
+            <div class="nav-item" data-page="alertas">
+                <i class="bi bi-exclamation-triangle"></i> Alertas
+            </div>
+            <div class="nav-item" data-page="compras">
+                <i class="bi bi-cart3"></i> Lista de Compras
+            </div>
+            <div class="nav-item" data-page="chat">
+                <i class="bi bi-robot"></i> Assistente IA
+            </div>
+            <div class="nav-item" data-page="relatorios">
+                <i class="bi bi-bar-chart"></i> Relatórios
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+
+        <!-- Dashboard -->
+        <div id="page-dashboard" class="page-section active">
+            <div class="page-header">
+                <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
+                <button class="btn btn-primary-custom" onclick="carregarDashboard()">
+                    <i class="bi bi-arrow-clockwise"></i> Atualizar
+                </button>
             </div>
 
-            <div class="col-md-9 p-5">
-                <div id="welcomeScreen" class="text-center py-5">
-                    <div class="display-1 text-muted mb-4 opacity-25">📦</div>
-                    <h3 class="text-secondary">Pronto para Auditar</h3>
-                    <p class="text-muted">Busque e selecione um item para iniciar a análise estratégica de estoque.</p>
-                </div>
-
-                <div id="analysisPanel" style="display: none;">
-                    <div class="card card-pro p-4 mb-4 border-bottom border-5 border-warning">
+            <!-- KPIs -->
+            <div class="row g-4 mb-4" id="kpis-container">
+                <div class="col-md-4 col-lg-2">
+                    <div class="kpi-card">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <h1 id="activeItemName" class="fw-bold mb-1">--</h1>
-                                <p id="activeItemUnit" class="text-muted text-uppercase small ls-1">--</p>
+                                <div class="value" id="kpi-total">-</div>
+                                <div class="label">Total Itens</div>
                             </div>
-                            <div class="text-end">
-                                <span class="display-6 fw-bold text-primary" id="activeItemStock">--</span>
-                                <div class="text-muted small" id="labelSaldo">SALDO EM ESTOQUE</div>
+                            <div class="icon" style="background: #e0e7ff; color: #4f46e5;">
+                                <i class="bi bi-box"></i>
                             </div>
                         </div>
                     </div>
-
-                    <div class="card card-pro p-4">
-                        <div class="d-flex align-items-center mb-4 border-bottom pb-3">
-                            <h4 class="fw-bold m-0">🤖 Análise da Inteligência Artificial</h4>
-                            <div class="spinner-border spinner-border-sm ms-3 text-warning" id="loaderIA"></div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="kpi-card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="value" id="kpi-criticos" style="color: var(--danger);">-</div>
+                                <div class="label">Críticos</div>
+                            </div>
+                            <div class="icon" style="background: #fee2e2; color: var(--danger);">
+                                <i class="bi bi-exclamation-circle"></i>
+                            </div>
                         </div>
-                        <div id="iaResponse" class="fs-5 lh-lg" style="white-space: pre-wrap; color: #444;">
-                            Aguardando comando...
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="kpi-card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="value" id="kpi-zerados">-</div>
+                                <div class="label">Zerados</div>
+                            </div>
+                            <div class="icon" style="background: #f3f4f6; color: #6b7280;">
+                                <i class="bi bi-dash-circle"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="kpi-card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="value" id="kpi-negativos" style="color: var(--danger);">-</div>
+                                <div class="label">Negativos</div>
+                            </div>
+                            <div class="icon" style="background: #fee2e2; color: var(--danger);">
+                                <i class="bi bi-x-circle"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="kpi-card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="value" id="kpi-consumo">-</div>
+                                <div class="label">Consumo 30d</div>
+                            </div>
+                            <div class="icon" style="background: #d1fae5; color: var(--success);">
+                                <i class="bi bi-graph-up"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="kpi-card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="value" id="kpi-estoque">-</div>
+                                <div class="label">Em Estoque</div>
+                            </div>
+                            <div class="icon" style="background: #dbeafe; color: var(--info);">
+                                <i class="bi bi-boxes"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-6">
+                    <div class="card card-custom h-100">
+                        <div class="card-header">
+                            <i class="bi bi-bar-chart"></i> Top 10 Maior Consumo
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chart-consumo"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card card-custom h-100">
+                        <div class="card-header">
+                            <i class="bi bi-pie-chart"></i> Distribuição de Cobertura
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chart-cobertura"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tables -->
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <div class="card card-custom">
+                        <div class="card-header">
+                            <i class="bi bi-exclamation-triangle text-danger"></i> Itens Mais Críticos
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-custom" id="table-criticos">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Saldo</th>
+                                        <th>Cobertura</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card card-custom">
+                        <div class="card-header">
+                            <i class="bi bi-fire text-warning"></i> Top Consumo
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-custom" id="table-consumo">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Consumo 30d</th>
+                                        <th>Saldo</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading-dashboard">
+                <div class="spinner"></div>
+                <p>Carregando dados...</p>
+            </div>
+        </div>
+
+        <!-- Consulta -->
+        <div id="page-consulta" class="page-section">
+            <div class="page-header">
+                <h2><i class="bi bi-search"></i> Consulta de Estoque</h2>
+            </div>
+
+            <div class="card card-custom mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <div class="search-box">
+                                <i class="bi bi-search"></i>
+                                <input type="text" id="input-busca" class="form-control" placeholder="Digite o nome do item..." onkeypress="if(event.key==='Enter') buscarItem()">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary-custom w-100 h-100" onclick="buscarItem()">
+                                <i class="bi bi-search"></i> Buscar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="resultado-busca"></div>
+
+            <div class="loading" id="loading-busca">
+                <div class="spinner"></div>
+                <p>Buscando...</p>
+            </div>
+        </div>
+
+        <!-- Alertas -->
+        <div id="page-alertas" class="page-section">
+            <div class="page-header">
+                <h2><i class="bi bi-exclamation-triangle"></i> Alertas do Sistema</h2>
+            </div>
+
+            <!-- Resumo Alertas -->
+            <div class="row g-3 mb-4" id="resumo-alertas">
+                <div class="col-md-4">
+                    <div class="alert-card alert-critico" onclick="filtrarAlertas('criticos')">
+                        <div>
+                            <strong style="font-size: 2rem;" id="alert-criticos">0</strong>
+                            <div>Críticos (&lt;7 dias)</div>
+                        </div>
+                        <i class="bi bi-exclamation-circle" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="alert-card alert-urgente" onclick="filtrarAlertas('urgentes')">
+                        <div>
+                            <strong style="font-size: 2rem;" id="alert-urgentes">0</strong>
+                            <div>Urgentes (7-15 dias)</div>
+                        </div>
+                        <i class="bi bi-exclamation-triangle" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="alert-card alert-atencao" onclick="filtrarAlertas('atencao')">
+                        <div>
+                            <strong style="font-size: 2rem;" id="alert-atencao">0</strong>
+                            <div>Atenção (15-30 dias)</div>
+                        </div>
+                        <i class="bi bi-info-circle" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card card-custom">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-list"></i> Lista de Alertas</span>
+                    <select id="filtro-alertas" class="form-select" style="width: auto;" onchange="filtrarAlertas(this.value)">
+                        <option value="todos">Todos</option>
+                        <option value="criticos">Críticos</option>
+                        <option value="urgentes">Urgentes</option>
+                        <option value="atencao">Atenção</option>
+                        <option value="zerados">Zerados</option>
+                        <option value="negativos">Negativos</option>
+                    </select>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-custom" id="table-alertas">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Saldo</th>
+                                    <th>Consumo 30d</th>
+                                    <th>Cobertura</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading-alertas">
+                <div class="spinner"></div>
+                <p>Carregando alertas...</p>
+            </div>
+        </div>
+
+        <!-- Lista de Compras -->
+        <div id="page-compras" class="page-section">
+            <div class="page-header">
+                <h2><i class="bi bi-cart3"></i> Lista de Compras Inteligente</h2>
+            </div>
+
+            <div class="card card-custom mb-4">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Cobertura Alvo (dias)</label>
+                            <input type="number" id="input-cobertura" class="form-control" value="45">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Margem de Segurança (%)</label>
+                            <input type="number" id="input-margem" class="form-control" value="20">
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary-custom w-100" onclick="gerarListaCompras()">
+                                <i class="bi bi-cart-plus"></i> Gerar Lista
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4" id="resumo-compras" style="display:none;">
+                <div class="col-md-3">
+                    <div class="kpi-card">
+                        <div class="value" id="compras-total">0</div>
+                        <div class="label">Itens para Comprar</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card">
+                        <div class="value" id="compras-unidades">0</div>
+                        <div class="label">Total de Unidades</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card">
+                        <div class="value text-danger" id="compras-criticos">0</div>
+                        <div class="label">Críticos</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card">
+                        <div class="value text-warning" id="compras-urgentes">0</div>
+                        <div class="label">Urgentes</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card card-custom">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-list-check"></i> Lista de Compras</span>
+                    <button class="btn btn-sm btn-outline-success" onclick="exportarCompras()">
+                        <i class="bi bi-download"></i> Exportar CSV
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-custom" id="table-compras">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Saldo Atual</th>
+                                    <th>Média Diária</th>
+                                    <th>Cobertura Atual</th>
+                                    <th>Qtd Sugerida</th>
+                                    <th>Urgência</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading-compras">
+                <div class="spinner"></div>
+                <p>Gerando lista...</p>
+            </div>
+        </div>
+
+        <!-- Chat IA -->
+        <div id="page-chat" class="page-section">
+            <div class="page-header">
+                <h2><i class="bi bi-robot"></i> Assistente IA</h2>
+            </div>
+
+            <div class="card card-custom">
+                <div class="card-body">
+                    <div class="chat-container" id="chat-messages">
+                        <div class="chat-message chat-bot">
+                            <strong>🤖 Assistente Marfim</strong><br>
+                            Olá! Sou o assistente de estoque da Marfim. Posso ajudar com:
+                            <ul class="mb-0 mt-2">
+                                <li>Consulta de saldo de itens</li>
+                                <li>Análise de consumo</li>
+                                <li>Recomendações de compra</li>
+                                <li>Alertas e previsões</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="input-group mt-3">
+                        <input type="text" id="input-chat" class="form-control" placeholder="Digite sua pergunta..." onkeypress="if(event.key==='Enter') enviarChat()">
+                        <button class="btn btn-primary-custom" onclick="enviarChat()">
+                            <i class="bi bi-send"></i> Enviar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relatórios -->
+        <div id="page-relatorios" class="page-section">
+            <div class="page-header">
+                <h2><i class="bi bi-bar-chart"></i> Relatórios e Análises</h2>
+            </div>
+
+            <div class="card card-custom mb-4">
+                <div class="card-header">
+                    <i class="bi bi-graph-up"></i> Curva ABC - Por Consumo
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4" id="resumo-abc">
+                        <div class="col-md-4">
+                            <div class="alert alert-success">
+                                <strong>Classe A</strong> - <span id="abc-a">0</span> itens (80% do consumo)
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="alert alert-warning">
+                                <strong>Classe B</strong> - <span id="abc-b">0</span> itens (15% do consumo)
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="alert alert-secondary">
+                                <strong>Classe C</strong> - <span id="abc-c">0</span> itens (5% do consumo)
+                            </div>
+                        </div>
+                    </div>
+                    <canvas id="chart-abc"></canvas>
+                </div>
+            </div>
+
+            <div class="loading" id="loading-relatorios">
+                <div class="spinner"></div>
+                <p>Carregando relatório...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal Análise IA -->
+    <div class="modal fade" id="modal-analise" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background: var(--primary); color: white;">
+                    <h5 class="modal-title"><i class="bi bi-robot"></i> Análise IA - <span id="modal-item-nome"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="modal-analise-content">
+                        <div class="text-center py-4">
+                            <div class="spinner"></div>
+                            <p>Analisando com IA...</p>
                         </div>
                     </div>
                 </div>
@@ -71,50 +794,414 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // ============================================================
+        // NAVEGAÇÃO
+        // ============================================================
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const page = item.dataset.page;
+
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                item.classList.add('active');
+
+                document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+                document.getElementById('page-' + page).classList.add('active');
+
+                if (page === 'dashboard') carregarDashboard();
+                if (page === 'alertas') carregarAlertas();
+                if (page === 'relatorios') carregarCurvaABC();
+            });
+        });
+
+        // ============================================================
+        // CHARTS
+        // ============================================================
+        let chartConsumo, chartCobertura, chartABC;
+
+        // ============================================================
+        // DASHBOARD
+        // ============================================================
+        async function carregarDashboard() {
+            document.getElementById('loading-dashboard').classList.add('show');
+
+            try {
+                const response = await fetch('/api/dashboard');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('kpi-total').textContent = data.kpis.total_itens.toLocaleString('pt-BR');
+                    document.getElementById('kpi-criticos').textContent = data.kpis.itens_criticos;
+                    document.getElementById('kpi-zerados').textContent = data.kpis.itens_zerados;
+                    document.getElementById('kpi-negativos').textContent = data.kpis.itens_negativos;
+                    document.getElementById('kpi-consumo').textContent = data.kpis.consumo_30d.toLocaleString('pt-BR');
+                    document.getElementById('kpi-estoque').textContent = data.kpis.estoque_total.toLocaleString('pt-BR');
+
+                    if (chartConsumo) chartConsumo.destroy();
+                    chartConsumo = new Chart(document.getElementById('chart-consumo'), {
+                        type: 'bar',
+                        data: {
+                            labels: data.top_consumo.map(i => i.Item.substring(0, 20)),
+                            datasets: [{
+                                label: 'Consumo 30d',
+                                data: data.top_consumo.map(i => i.Consumo_30d),
+                                backgroundColor: '#c5a059'
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+
+                    if (chartCobertura) chartCobertura.destroy();
+                    chartCobertura = new Chart(document.getElementById('chart-cobertura'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Crítico (<7d)', 'Urgente (7-15d)', 'Atenção (15-30d)', 'Normal (>30d)'],
+                            datasets: [{
+                                data: [data.distribuicao.critico, data.distribuicao.urgente, data.distribuicao.atencao, data.distribuicao.normal],
+                                backgroundColor: ['#ef4444', '#f59e0b', '#eab308', '#22c55e']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { position: 'bottom' } }
+                        }
+                    });
+
+                    const tbCriticos = document.querySelector('#table-criticos tbody');
+                    tbCriticos.innerHTML = data.criticos.map(i => `
+                        <tr>
+                            <td>${i.Item}</td>
+                            <td>${i.Saldo.toLocaleString('pt-BR')}</td>
+                            <td><span class="badge ${i.Dias_Cobertura < 7 ? 'badge-critico' : 'badge-urgente'}">${i.Dias_Cobertura} dias</span></td>
+                        </tr>
+                    `).join('');
+
+                    const tbConsumo = document.querySelector('#table-consumo tbody');
+                    tbConsumo.innerHTML = data.top_consumo.map(i => `
+                        <tr>
+                            <td>${i.Item}</td>
+                            <td>${i.Consumo_30d.toLocaleString('pt-BR')}</td>
+                            <td>${i.Saldo.toLocaleString('pt-BR')}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+
+            document.getElementById('loading-dashboard').classList.remove('show');
+        }
+
+        // ============================================================
+        // CONSULTA
+        // ============================================================
         async function buscarItem() {
-            const item = document.getElementById('inputBusca').value;
-            const res = await fetch('/buscar', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({item})
-            });
-            const dados = await res.json();
-            
-            let html = '';
-            dados.forEach(d => {
-                html += `
-                <div onclick="analisarIA('${d.Item}', '${d['Saldo Atual']}', '${d.Unidade}')" class="p-3 product-item">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="text-truncate me-2" style="max-width: 180px;">${d.Item}</div>
-                        <span class="badge-unit">${d.Unidade}</span>
-                    </div>
-                    <div class="small opacity-50 mt-1">Saldo: ${d['Saldo Atual']}</div>
-                </div>`;
-            });
-            document.getElementById('listaResultados').innerHTML = html;
+            const termo = document.getElementById('input-busca').value;
+            if (!termo) return;
+
+            document.getElementById('loading-busca').classList.add('show');
+            document.getElementById('resultado-busca').innerHTML = '';
+
+            try {
+                const response = await fetch('/api/buscar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ item: termo })
+                });
+                const data = await response.json();
+
+                if (data.success && data.itens.length > 0) {
+                    let html = `<div class="alert alert-info mb-3"><i class="bi bi-check-circle"></i> ${data.total} item(s) encontrado(s)</div>`;
+                    html += '<div class="row g-3">';
+
+                    data.itens.forEach(item => {
+                        const cobClass = item.Dias_Cobertura < 7 ? 'danger' : (item.Dias_Cobertura < 15 ? 'warning' : (item.Dias_Cobertura < 30 ? 'info' : 'success'));
+                        html += `
+                            <div class="col-md-6">
+                                <div class="card card-custom">
+                                    <div class="card-body">
+                                        <h5 class="mb-3">${item.Item}</h5>
+                                        <div class="row text-center">
+                                            <div class="col-4">
+                                                <div class="fs-4 fw-bold">${item.Saldo.toLocaleString('pt-BR')}</div>
+                                                <small class="text-muted">Saldo</small>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="fs-4 fw-bold">${item.Consumo_30d.toLocaleString('pt-BR')}</div>
+                                                <small class="text-muted">Consumo 30d</small>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="fs-4 fw-bold text-${cobClass}">${item.Dias_Cobertura}</div>
+                                                <small class="text-muted">Dias Cobertura</small>
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-primary-custom w-100 mt-3" onclick="analisarItem('${item.Item.replace(/'/g, "\\'")}')">
+                                            <i class="bi bi-robot"></i> Analisar com IA
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += '</div>';
+                    document.getElementById('resultado-busca').innerHTML = html;
+                } else {
+                    document.getElementById('resultado-busca').innerHTML = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Nenhum item encontrado</div>';
+                }
+            } catch (error) {
+                document.getElementById('resultado-busca').innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro ao buscar</div>';
+            }
+
+            document.getElementById('loading-busca').classList.remove('show');
         }
 
-        async function analisarIA(item, saldo, unidade) {
-            // UI Setup
-            document.getElementById('welcomeScreen').style.display = 'none';
-            document.getElementById('analysisPanel').style.display = 'block';
-            document.getElementById('activeItemName').innerText = item;
-            document.getElementById('activeItemUnit').innerText = `Unidade de Medida: ${unidade}`;
-            document.getElementById('activeItemStock').innerText = saldo;
-            document.getElementById('iaResponse').innerHTML = '<span class="text-muted">Recuperando histórico e processando com Llama 3.3...</span>';
-            document.getElementById('loaderIA').style.display = 'inline-block';
+        // ============================================================
+        // ANÁLISE IA
+        // ============================================================
+        async function analisarItem(item) {
+            document.getElementById('modal-item-nome').textContent = item;
+            document.getElementById('modal-analise-content').innerHTML = '<div class="text-center py-4"><div class="spinner"></div><p>Analisando com IA...</p></div>';
 
-            const res = await fetch('/analisar', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({item, saldo})
-            });
-            const data = await res.json();
-            
-            document.getElementById('loaderIA').style.display = 'none';
-            document.getElementById('iaResponse').innerText = data.resposta;
+            new bootstrap.Modal(document.getElementById('modal-analise')).show();
+
+            try {
+                const response = await fetch('/api/analisar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ item })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('modal-analise-content').innerHTML = `
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;">
+                            <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">${data.analise}</pre>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('modal-analise-content').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('modal-analise-content').innerHTML = '<div class="alert alert-danger">Erro ao analisar</div>';
+            }
         }
+
+        // ============================================================
+        // ALERTAS
+        // ============================================================
+        async function carregarAlertas(tipo = 'todos') {
+            document.getElementById('loading-alertas').classList.add('show');
+
+            try {
+                const response = await fetch(`/api/alertas?tipo=${tipo}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('alert-criticos').textContent = data.resumo.criticos;
+                    document.getElementById('alert-urgentes').textContent = data.resumo.urgentes;
+                    document.getElementById('alert-atencao').textContent = data.resumo.atencao;
+
+                    const tbody = document.querySelector('#table-alertas tbody');
+                    tbody.innerHTML = data.alertas.map(item => {
+                        let badge = 'badge-normal';
+                        if (item.Dias_Cobertura < 7) badge = 'badge-critico';
+                        else if (item.Dias_Cobertura < 15) badge = 'badge-urgente';
+                        else if (item.Dias_Cobertura < 30) badge = 'badge-atencao';
+
+                        return `
+                            <tr>
+                                <td>${item.Item}</td>
+                                <td>${item.Saldo.toLocaleString('pt-BR')}</td>
+                                <td>${item.Consumo_30d.toLocaleString('pt-BR')}</td>
+                                <td><span class="badge ${badge}">${item.Dias_Cobertura} dias</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="analisarItem('${item.Item.replace(/'/g, "\\'")}')">
+                                        <i class="bi bi-robot"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+
+            document.getElementById('loading-alertas').classList.remove('show');
+        }
+
+        function filtrarAlertas(tipo) {
+            document.getElementById('filtro-alertas').value = tipo;
+            carregarAlertas(tipo);
+        }
+
+        // ============================================================
+        // LISTA DE COMPRAS
+        // ============================================================
+        let listaComprasData = [];
+
+        async function gerarListaCompras() {
+            const dias = parseInt(document.getElementById('input-cobertura').value);
+            const margem = parseInt(document.getElementById('input-margem').value);
+
+            document.getElementById('loading-compras').classList.add('show');
+
+            try {
+                const response = await fetch('/api/lista-compras', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dias_cobertura: dias, margem: margem })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    listaComprasData = data.lista;
+
+                    document.getElementById('resumo-compras').style.display = 'flex';
+                    document.getElementById('compras-total').textContent = data.resumo.total_itens;
+                    document.getElementById('compras-unidades').textContent = data.resumo.total_unidades.toLocaleString('pt-BR');
+                    document.getElementById('compras-criticos').textContent = data.resumo.criticos;
+                    document.getElementById('compras-urgentes').textContent = data.resumo.urgentes;
+
+                    const tbody = document.querySelector('#table-compras tbody');
+                    tbody.innerHTML = data.lista.map(item => {
+                        let badge = 'badge-normal';
+                        if (item.Urgencia === 'CRITICO') badge = 'badge-critico';
+                        else if (item.Urgencia === 'URGENTE') badge = 'badge-urgente';
+                        else if (item.Urgencia === 'ALTO') badge = 'badge-atencao';
+
+                        return `
+                            <tr>
+                                <td>${item.Item}</td>
+                                <td>${item.Saldo.toLocaleString('pt-BR')}</td>
+                                <td>${item.Media_Diaria.toFixed(1)}</td>
+                                <td>${item.Dias_Cobertura} dias</td>
+                                <td><strong>${item.Qtd_Sugerida.toLocaleString('pt-BR')}</strong></td>
+                                <td><span class="badge ${badge}">${item.Urgencia}</span></td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+
+            document.getElementById('loading-compras').classList.remove('show');
+        }
+
+        function exportarCompras() {
+            if (!listaComprasData.length) {
+                alert('Gere a lista primeiro!');
+                return;
+            }
+
+            let csv = 'Item,Saldo Atual,Media Diaria,Cobertura Atual,Qtd Sugerida,Urgencia\n';
+            listaComprasData.forEach(item => {
+                csv += `"${item.Item}",${item.Saldo},${item.Media_Diaria},${item.Dias_Cobertura},${item.Qtd_Sugerida},${item.Urgencia}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'lista_compras_' + new Date().toISOString().slice(0,10) + '.csv';
+            a.click();
+        }
+
+        // ============================================================
+        // CHAT
+        // ============================================================
+        async function enviarChat() {
+            const input = document.getElementById('input-chat');
+            const pergunta = input.value.trim();
+            if (!pergunta) return;
+
+            const container = document.getElementById('chat-messages');
+
+            container.innerHTML += `<div class="chat-message chat-user">${pergunta}</div>`;
+            input.value = '';
+
+            container.innerHTML += `<div class="chat-message chat-bot" id="chat-loading"><i class="bi bi-three-dots"></i> Pensando...</div>`;
+            container.scrollTop = container.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pergunta })
+                });
+                const data = await response.json();
+
+                document.getElementById('chat-loading').remove();
+
+                if (data.success) {
+                    container.innerHTML += `<div class="chat-message chat-bot"><pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">${data.resposta}</pre></div>`;
+                } else {
+                    container.innerHTML += `<div class="chat-message chat-bot text-danger">Erro: ${data.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('chat-loading').remove();
+                container.innerHTML += `<div class="chat-message chat-bot text-danger">Erro de conexão</div>`;
+            }
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // ============================================================
+        // RELATÓRIOS
+        // ============================================================
+        async function carregarCurvaABC() {
+            document.getElementById('loading-relatorios').classList.add('show');
+
+            try {
+                const response = await fetch('/api/relatorio/curva-abc');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('abc-a').textContent = data.resumo.A.itens;
+                    document.getElementById('abc-b').textContent = data.resumo.B.itens;
+                    document.getElementById('abc-c').textContent = data.resumo.C.itens;
+
+                    if (chartABC) chartABC.destroy();
+                    chartABC = new Chart(document.getElementById('chart-abc'), {
+                        type: 'bar',
+                        data: {
+                            labels: data.dados.map(i => i.Item.substring(0, 15)),
+                            datasets: [{
+                                label: 'Consumo 30d',
+                                data: data.dados.map(i => i.Consumo_30d),
+                                backgroundColor: data.dados.map(i => {
+                                    if (i.Classe === 'A') return '#22c55e';
+                                    if (i.Classe === 'B') return '#f59e0b';
+                                    return '#94a3b8';
+                                })
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+
+            document.getElementById('loading-relatorios').classList.remove('show');
+        }
+
+        // ============================================================
+        // INIT
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarDashboard();
+        });
     </script>
 </body>
 </html>
