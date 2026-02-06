@@ -354,10 +354,18 @@
         <div id="page-dashboard" class="page-section active">
             <div class="page-header">
                 <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
-                <button class="btn btn-primary-custom" onclick="carregarDashboard()">
-                    <i class="bi bi-arrow-clockwise"></i> Atualizar
-                </button>
+                <div>
+                    <button class="btn btn-outline-secondary me-2" onclick="executarDiagnostico()">
+                        <i class="bi bi-bug"></i> Diagnóstico
+                    </button>
+                    <button class="btn btn-primary-custom" onclick="carregarDashboard()">
+                        <i class="bi bi-arrow-clockwise"></i> Atualizar
+                    </button>
+                </div>
             </div>
+
+            <!-- Área de erros/diagnóstico -->
+            <div id="area-erros" class="mb-4" style="display:none;"></div>
 
             <!-- KPIs -->
             <div class="row g-4 mb-4" id="kpis-container">
@@ -825,12 +833,14 @@
         // ============================================================
         async function carregarDashboard() {
             document.getElementById('loading-dashboard').classList.add('show');
+            document.getElementById('area-erros').style.display = 'none';
 
             try {
                 const response = await fetch('/api/dashboard');
                 const data = await response.json();
 
                 if (data.success) {
+                    // Atualizar KPIs
                     document.getElementById('kpi-total').textContent = data.kpis.total_itens.toLocaleString('pt-BR');
                     document.getElementById('kpi-criticos').textContent = data.kpis.itens_criticos;
                     document.getElementById('kpi-zerados').textContent = data.kpis.itens_zerados;
@@ -838,60 +848,87 @@
                     document.getElementById('kpi-consumo').textContent = data.kpis.consumo_30d.toLocaleString('pt-BR');
                     document.getElementById('kpi-estoque').textContent = data.kpis.estoque_total.toLocaleString('pt-BR');
 
+                    // Verificar se tem dados de consumo
+                    if (data.kpis.consumo_30d === 0 && data.kpis.total_itens > 0) {
+                        mostrarErro('Consumo zerado nos últimos 30 dias', 'Isso pode indicar que não há movimentações recentes ou que as datas não estão sendo lidas corretamente. Clique em "Diagnóstico" para mais detalhes.');
+                    }
+
+                    // Gráfico de consumo
                     if (chartConsumo) chartConsumo.destroy();
-                    chartConsumo = new Chart(document.getElementById('chart-consumo'), {
-                        type: 'bar',
-                        data: {
-                            labels: data.top_consumo.map(i => i.Item.substring(0, 20)),
-                            datasets: [{
-                                label: 'Consumo 30d',
-                                data: data.top_consumo.map(i => i.Consumo_30d),
-                                backgroundColor: '#c5a059'
-                            }]
-                        },
-                        options: {
-                            indexAxis: 'y',
-                            responsive: true,
-                            plugins: { legend: { display: false } }
-                        }
-                    });
+                    if (data.top_consumo && data.top_consumo.length > 0) {
+                        chartConsumo = new Chart(document.getElementById('chart-consumo'), {
+                            type: 'bar',
+                            data: {
+                                labels: data.top_consumo.map(i => i.Item.substring(0, 20)),
+                                datasets: [{
+                                    label: 'Consumo 30d',
+                                    data: data.top_consumo.map(i => i.Consumo_30d),
+                                    backgroundColor: '#c5a059'
+                                }]
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                responsive: true,
+                                plugins: { legend: { display: false } }
+                            }
+                        });
+                    } else {
+                        document.getElementById('chart-consumo').parentElement.innerHTML = '<p class="text-center text-muted py-4">Sem dados de consumo nos últimos 30 dias</p>';
+                    }
 
+                    // Gráfico de cobertura
                     if (chartCobertura) chartCobertura.destroy();
-                    chartCobertura = new Chart(document.getElementById('chart-cobertura'), {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['Crítico (<7d)', 'Urgente (7-15d)', 'Atenção (15-30d)', 'Normal (>30d)'],
-                            datasets: [{
-                                data: [data.distribuicao.critico, data.distribuicao.urgente, data.distribuicao.atencao, data.distribuicao.normal],
-                                backgroundColor: ['#ef4444', '#f59e0b', '#eab308', '#22c55e']
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: { legend: { position: 'bottom' } }
-                        }
-                    });
+                    const totalDist = data.distribuicao.critico + data.distribuicao.urgente + data.distribuicao.atencao + data.distribuicao.normal;
+                    if (totalDist > 0) {
+                        chartCobertura = new Chart(document.getElementById('chart-cobertura'), {
+                            type: 'doughnut',
+                            data: {
+                                labels: ['Crítico (<7d)', 'Urgente (7-15d)', 'Atenção (15-30d)', 'Normal (>30d)'],
+                                datasets: [{
+                                    data: [data.distribuicao.critico, data.distribuicao.urgente, data.distribuicao.atencao, data.distribuicao.normal],
+                                    backgroundColor: ['#ef4444', '#f59e0b', '#eab308', '#22c55e']
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: { legend: { position: 'bottom' } }
+                            }
+                        });
+                    }
 
+                    // Tabela críticos
                     const tbCriticos = document.querySelector('#table-criticos tbody');
-                    tbCriticos.innerHTML = data.criticos.map(i => `
-                        <tr>
-                            <td>${i.Item}</td>
-                            <td>${i.Saldo.toLocaleString('pt-BR')}</td>
-                            <td><span class="badge ${i.Dias_Cobertura < 7 ? 'badge-critico' : 'badge-urgente'}">${i.Dias_Cobertura} dias</span></td>
-                        </tr>
-                    `).join('');
+                    if (data.criticos && data.criticos.length > 0) {
+                        tbCriticos.innerHTML = data.criticos.map(i => `
+                            <tr>
+                                <td>${i.Item}</td>
+                                <td>${i.Saldo.toLocaleString('pt-BR')}</td>
+                                <td><span class="badge ${i.Dias_Cobertura < 7 ? 'badge-critico' : 'badge-urgente'}">${i.Dias_Cobertura} dias</span></td>
+                            </tr>
+                        `).join('');
+                    } else {
+                        tbCriticos.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Nenhum item crítico</td></tr>';
+                    }
 
+                    // Tabela consumo
                     const tbConsumo = document.querySelector('#table-consumo tbody');
-                    tbConsumo.innerHTML = data.top_consumo.map(i => `
-                        <tr>
-                            <td>${i.Item}</td>
-                            <td>${i.Consumo_30d.toLocaleString('pt-BR')}</td>
-                            <td>${i.Saldo.toLocaleString('pt-BR')}</td>
-                        </tr>
-                    `).join('');
+                    if (data.top_consumo && data.top_consumo.length > 0) {
+                        tbConsumo.innerHTML = data.top_consumo.map(i => `
+                            <tr>
+                                <td>${i.Item}</td>
+                                <td>${i.Consumo_30d.toLocaleString('pt-BR')}</td>
+                                <td>${i.Saldo.toLocaleString('pt-BR')}</td>
+                            </tr>
+                        `).join('');
+                    } else {
+                        tbConsumo.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem dados de consumo</td></tr>';
+                    }
+                } else {
+                    mostrarErro(data.error || 'Erro ao carregar dados');
                 }
             } catch (error) {
                 console.error('Erro:', error);
+                mostrarErro('Erro de conexão com o servidor', error.message);
             }
 
             document.getElementById('loading-dashboard').classList.remove('show');
@@ -1194,6 +1231,144 @@
             }
 
             document.getElementById('loading-relatorios').classList.remove('show');
+        }
+
+        // ============================================================
+        // DIAGNÓSTICO
+        // ============================================================
+        async function executarDiagnostico() {
+            const areaErros = document.getElementById('area-erros');
+            areaErros.style.display = 'block';
+            areaErros.innerHTML = `
+                <div class="card card-custom">
+                    <div class="card-header bg-info text-white">
+                        <i class="bi bi-bug"></i> Diagnóstico do Sistema
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center py-3">
+                            <div class="spinner"></div>
+                            <p>Verificando conexão e dados...</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/debug');
+                const data = await response.json();
+
+                let html = `
+                    <div class="card card-custom">
+                        <div class="card-header ${data.success ? 'bg-success' : 'bg-danger'} text-white">
+                            <i class="bi bi-${data.success ? 'check-circle' : 'x-circle'}"></i>
+                            Diagnóstico do Sistema
+                            <button type="button" class="btn-close btn-close-white float-end" onclick="document.getElementById('area-erros').style.display='none'"></button>
+                        </div>
+                        <div class="card-body">
+                `;
+
+                if (data.success) {
+                    html += `
+                        <h6 class="text-success"><i class="bi bi-check"></i> Conexão OK - ${data.planilha}</h6>
+                        <hr>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Planilha ÍNDICE_ITENS</h6>
+                                <ul>
+                                    <li>Linhas: <strong>${data.indice_itens.total_linhas}</strong></li>
+                                    <li>Colunas: <code>${data.indice_itens.colunas.join(', ')}</code></li>
+                                </ul>
+                                ${data.indice_itens.amostra.length > 0 ? `
+                                    <p><small>Amostra primeira linha:</small></p>
+                                    <pre class="bg-light p-2" style="font-size: 0.75rem; max-height: 100px; overflow: auto;">${JSON.stringify(data.indice_itens.amostra[0], null, 2)}</pre>
+                                ` : ''}
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Planilha ESTOQUE</h6>
+                                <ul>
+                                    <li>Linhas: <strong>${data.estoque.total_linhas}</strong></li>
+                                    <li>Colunas: <code>${data.estoque.colunas.join(', ')}</code></li>
+                                </ul>
+                                ${data.estoque.amostra.length > 0 ? `
+                                    <p><small>Amostra primeira linha:</small></p>
+                                    <pre class="bg-light p-2" style="font-size: 0.75rem; max-height: 100px; overflow: auto;">${JSON.stringify(data.estoque.amostra[0], null, 2)}</pre>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <hr>
+                        <h6>Processamento</h6>
+                        <ul>
+                            <li>Status: ${data.processamento.ok ? '<span class="text-success">OK</span>' : '<span class="text-danger">ERRO</span>'}</li>
+                            <li>Total de itens: <strong>${data.processamento.itens_total}</strong></li>
+                            <li>Itens com saldo > 0: <strong>${data.processamento.itens_com_saldo}</strong></li>
+                            <li>Itens com consumo: <strong>${data.processamento.itens_com_consumo}</strong></li>
+                            <li>Consumo total 30d: <strong>${data.processamento.consumo_30d_total.toLocaleString('pt-BR')}</strong></li>
+                            <li>Datas válidas no histórico: <strong>${data.processamento.datas_validas_historico}</strong></li>
+                        </ul>
+                        <hr>
+                        <p>IA (Groq): ${data.ia_configurada ? '<span class="badge bg-success">Configurada</span>' : '<span class="badge bg-warning">Não configurada</span>'}</p>
+                    `;
+
+                    // Avisos
+                    if (data.processamento.itens_com_consumo === 0) {
+                        html += `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> <strong>Aviso:</strong> Nenhum item tem consumo registrado nos últimos 30 dias. Verifique se a coluna de "Data" está no formato DD/MM/YYYY e se há movimentações recentes na planilha ESTOQUE.</div>`;
+                    }
+                    if (data.processamento.datas_validas_historico === 0 && data.estoque.total_linhas > 0) {
+                        html += `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> <strong>Problema:</strong> Nenhuma data válida encontrada no histórico. Verifique o formato das datas na coluna "Data" da planilha ESTOQUE (deve ser DD/MM/YYYY).</div>`;
+                    }
+                } else {
+                    html += `
+                        <div class="alert alert-danger">
+                            <h6><i class="bi bi-x-circle"></i> Erro de Conexão</h6>
+                            <p>${data.error}</p>
+                            ${data.traceback ? `<pre class="bg-light p-2" style="font-size: 0.75rem; max-height: 200px; overflow: auto;">${data.traceback}</pre>` : ''}
+                        </div>
+                        <h6>Possíveis causas:</h6>
+                        <ul>
+                            <li>Arquivo <code>credentials.json</code> não encontrado ou inválido</li>
+                            <li>Planilha não compartilhada com a conta de serviço</li>
+                            <li>Nome da planilha incorreto</li>
+                            <li>Abas "ÍNDICE_ITENS" ou "ESTOQUE" não existem</li>
+                        </ul>
+                    `;
+                }
+
+                html += `</div></div>`;
+                areaErros.innerHTML = html;
+
+            } catch (error) {
+                areaErros.innerHTML = `
+                    <div class="card card-custom">
+                        <div class="card-header bg-danger text-white">
+                            <i class="bi bi-x-circle"></i> Erro de Conexão
+                            <button type="button" class="btn-close btn-close-white float-end" onclick="document.getElementById('area-erros').style.display='none'"></button>
+                        </div>
+                        <div class="card-body">
+                            <p>Não foi possível conectar ao servidor.</p>
+                            <p>Erro: <code>${error.message}</code></p>
+                            <hr>
+                            <h6>Verifique:</h6>
+                            <ul>
+                                <li>Se o servidor Flask está rodando (<code>python app_final.py</code>)</li>
+                                <li>Se está acessando o endereço correto (http://localhost:5000)</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function mostrarErro(mensagem, detalhes = null) {
+            const areaErros = document.getElementById('area-erros');
+            areaErros.style.display = 'block';
+            areaErros.innerHTML = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <strong><i class="bi bi-exclamation-triangle"></i> Erro:</strong> ${mensagem}
+                    ${detalhes ? `<hr><small>${detalhes}</small>` : ''}
+                    <br><button class="btn btn-sm btn-outline-danger mt-2" onclick="executarDiagnostico()">Executar Diagnóstico</button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
         }
 
         // ============================================================
