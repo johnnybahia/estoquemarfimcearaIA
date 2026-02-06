@@ -526,11 +526,11 @@ def api_debug():
         try:
             df_idx, df_hist = carregar_dados_completos()
             carregamento_ok = True
-            itens_total = len(df_idx)
-            itens_com_saldo = len(df_idx[df_idx['Saldo'] > 0])
-            itens_com_consumo = len(df_idx[df_idx['Consumo_30d'] > 0])
-            consumo_total = df_idx['Consumo_30d'].sum()
-            datas_validas = df_hist['Data'].notna().sum() if 'Data' in df_hist.columns else 0
+            itens_total = int(len(df_idx))
+            itens_com_saldo = int((df_idx['Saldo'] > 0).sum())
+            itens_com_consumo = int((df_idx['Consumo_30d'] > 0).sum())
+            consumo_total = float(df_idx['Consumo_30d'].sum())
+            datas_validas = int(df_hist['Data'].notna().sum()) if 'Data' in df_hist.columns else 0
         except Exception as e:
             carregamento_ok = False
             itens_total = 0
