@@ -109,11 +109,21 @@ def carregar_dados_completos():
         elif col_nome not in df_hist.columns:
             df_hist[col_nome] = 0
 
-    # Converter Data - tentar múltiplos formatos
+    # Converter Data - tentar múltiplos formatos (incluindo com hora)
     if col_data and col_data in df_hist.columns:
         df_hist['Data_Original'] = df_hist[col_data]
-        # Tentar diferentes formatos
-        for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y']:
+        # Tentar diferentes formatos (com e sem hora)
+        formatos = [
+            '%d/%m/%Y %H:%M:%S',  # 03/01/2022 00:00:00
+            '%d/%m/%Y',           # 03/01/2022
+            '%Y-%m-%d %H:%M:%S',  # 2022-01-03 00:00:00
+            '%Y-%m-%d',           # 2022-01-03
+            '%d-%m-%Y %H:%M:%S',
+            '%d-%m-%Y',
+            '%m/%d/%Y %H:%M:%S',
+            '%m/%d/%Y'
+        ]
+        for fmt in formatos:
             df_hist['Data'] = pd.to_datetime(df_hist[col_data], format=fmt, errors='coerce')
             if df_hist['Data'].notna().sum() > 0:
                 print(f"[DEBUG] Formato de data detectado: {fmt}")
