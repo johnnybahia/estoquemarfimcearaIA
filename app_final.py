@@ -109,28 +109,36 @@ def carregar_dados_completos():
         elif col_nome not in df_hist.columns:
             df_hist[col_nome] = 0
 
-    # Converter Data - tentar múltiplos formatos (incluindo com hora)
+    # Converter Data - usar método mais flexível
     if col_data and col_data in df_hist.columns:
         df_hist['Data_Original'] = df_hist[col_data]
-        # Tentar diferentes formatos (com e sem hora)
-        formatos = [
-            '%d/%m/%Y %H:%M:%S',  # 03/01/2022 00:00:00
-            '%d/%m/%Y',           # 03/01/2022
-            '%Y-%m-%d %H:%M:%S',  # 2022-01-03 00:00:00
-            '%Y-%m-%d',           # 2022-01-03
-            '%d-%m-%Y %H:%M:%S',
-            '%d-%m-%Y',
-            '%m/%d/%Y %H:%M:%S',
-            '%m/%d/%Y'
-        ]
-        for fmt in formatos:
-            df_hist['Data'] = pd.to_datetime(df_hist[col_data], format=fmt, errors='coerce')
-            if df_hist['Data'].notna().sum() > 0:
-                print(f"[DEBUG] Formato de data detectado: {fmt}")
-                break
-        # Fallback: tentar inferir automaticamente
-        if df_hist['Data'].isna().all():
-            df_hist['Data'] = pd.to_datetime(df_hist[col_data], dayfirst=True, errors='coerce')
+
+        # Primeiro: tentar inferência automática com dayfirst=True (mais flexível)
+        df_hist['Data'] = pd.to_datetime(df_hist[col_data], dayfirst=True, errors='coerce')
+        datas_inferidas = df_hist['Data'].notna().sum()
+
+        if datas_inferidas > 0:
+            print(f"[DEBUG] Datas parseadas automaticamente: {datas_inferidas}")
+        else:
+            # Fallback: tentar formatos específicos
+            formatos = [
+                '%d/%m/%Y %H:%M:%S',  # 03/01/2022 00:00:00
+                '%d/%m/%Y',           # 03/01/2022
+                '%Y-%m-%d %H:%M:%S',
+                '%Y-%m-%d',
+                '%d-%m-%Y %H:%M:%S',
+                '%d-%m-%Y',
+            ]
+            for fmt in formatos:
+                df_hist['Data'] = pd.to_datetime(df_hist[col_data], format=fmt, errors='coerce')
+                if df_hist['Data'].notna().sum() > 0:
+                    print(f"[DEBUG] Formato de data detectado: {fmt}")
+                    break
+
+        # Debug: mostrar exemplo de data original vs parseada
+        amostra = df_hist[df_hist['Data'].notna()].head(1)
+        if not amostra.empty:
+            print(f"[DEBUG] Exemplo: '{amostra['Data_Original'].iloc[0]}' -> {amostra['Data'].iloc[0]}")
     else:
         df_hist['Data'] = pd.NaT
         print(f"[AVISO] Coluna de data não encontrada")
@@ -144,21 +152,32 @@ def carregar_dados_completos():
     data_60d = hoje - timedelta(days=60)
     data_90d = hoje - timedelta(days=90)
 
+    # Normalizar nomes de itens para matching (remover espaços extras, uppercase)
+    df_idx['Item_Norm'] = df_idx['Item'].str.strip().str.upper()
+    df_hist['Item_Norm'] = df_hist['Item'].str.strip().str.upper()
+
+    # Debug: verificar sobreposição de itens
+    itens_idx = set(df_idx['Item_Norm'].unique())
+    itens_hist = set(df_hist['Item_Norm'].unique())
+    itens_comuns = itens_idx.intersection(itens_hist)
+    print(f"[DEBUG] Itens únicos ÍNDICE: {len(itens_idx)}, ESTOQUE: {len(itens_hist)}, Comuns: {len(itens_comuns)}")
+
     # Consumo por período (apenas se houver datas válidas)
     if datas_validas > 0:
-        consumo_30d = df_hist[df_hist['Data'] >= data_30d].groupby('Item')['Saída'].sum()
-        consumo_60d = df_hist[df_hist['Data'] >= data_60d].groupby('Item')['Saída'].sum()
-        consumo_90d = df_hist[df_hist['Data'] >= data_90d].groupby('Item')['Saída'].sum()
+        consumo_30d = df_hist[df_hist['Data'] >= data_30d].groupby('Item_Norm')['Saída'].sum()
+        consumo_60d = df_hist[df_hist['Data'] >= data_60d].groupby('Item_Norm')['Saída'].sum()
+        consumo_90d = df_hist[df_hist['Data'] >= data_90d].groupby('Item_Norm')['Saída'].sum()
+        print(f"[DEBUG] Registros últimos 30d: {(df_hist['Data'] >= data_30d).sum()}")
     else:
         # Se não há datas, usar todo o histórico
         print("[AVISO] Usando todo histórico (sem filtro de data)")
-        consumo_30d = df_hist.groupby('Item')['Saída'].sum()
+        consumo_30d = df_hist.groupby('Item_Norm')['Saída'].sum()
         consumo_60d = consumo_30d
         consumo_90d = consumo_30d
 
-    df_idx['Consumo_30d'] = df_idx['Item'].map(consumo_30d).fillna(0)
-    df_idx['Consumo_60d'] = df_idx['Item'].map(consumo_60d).fillna(0)
-    df_idx['Consumo_90d'] = df_idx['Item'].map(consumo_90d).fillna(0)
+    df_idx['Consumo_30d'] = df_idx['Item_Norm'].map(consumo_30d).fillna(0)
+    df_idx['Consumo_60d'] = df_idx['Item_Norm'].map(consumo_60d).fillna(0)
+    df_idx['Consumo_90d'] = df_idx['Item_Norm'].map(consumo_90d).fillna(0)
     df_idx['Media_Diaria'] = df_idx['Consumo_30d'] / 30
     df_idx['Dias_Cobertura'] = df_idx.apply(
         lambda r: round(r['Saldo'] / r['Media_Diaria'], 1) if r['Media_Diaria'] > 0 else 999,
@@ -541,13 +560,36 @@ def api_debug():
             itens_com_consumo = int((df_idx['Consumo_30d'] > 0).sum())
             consumo_total = float(df_idx['Consumo_30d'].sum())
             datas_validas = int(df_hist['Data'].notna().sum()) if 'Data' in df_hist.columns else 0
+
+            # Verificar matching de itens
+            itens_idx = set(df_idx['Item_Norm'].unique()) if 'Item_Norm' in df_idx.columns else set()
+            itens_hist = set(df_hist['Item_Norm'].unique()) if 'Item_Norm' in df_hist.columns else set()
+            itens_comuns = len(itens_idx.intersection(itens_hist))
+
+            # Datas recentes
+            from datetime import datetime, timedelta
+            hoje = datetime.now()
+            data_30d = hoje - timedelta(days=30)
+            registros_30d = int((df_hist['Data'] >= data_30d).sum()) if 'Data' in df_hist.columns else 0
+
+            # Exemplo de saída
+            saidas_exemplo = df_hist[df_hist['Saída'] > 0].head(3)[['Item', 'Saída', 'Data']].to_dict('records') if 'Saída' in df_hist.columns else []
+            for s in saidas_exemplo:
+                if pd.notna(s.get('Data')):
+                    s['Data'] = str(s['Data'])
+
         except Exception as e:
+            import traceback
             carregamento_ok = False
             itens_total = 0
             itens_com_saldo = 0
             itens_com_consumo = 0
             consumo_total = 0
             datas_validas = 0
+            itens_comuns = 0
+            registros_30d = 0
+            saidas_exemplo = []
+            print(f"[ERRO] {traceback.format_exc()}")
 
         return jsonify({
             'success': True,
@@ -568,7 +610,10 @@ def api_debug():
                 'itens_com_saldo': itens_com_saldo,
                 'itens_com_consumo': itens_com_consumo,
                 'consumo_30d_total': round(consumo_total, 0),
-                'datas_validas_historico': datas_validas
+                'datas_validas_historico': datas_validas,
+                'itens_comuns_idx_hist': itens_comuns,
+                'registros_ultimos_30d': registros_30d,
+                'exemplos_saida': saidas_exemplo
             },
             'ia_configurada': client_groq is not None
         })
