@@ -734,18 +734,31 @@
             <div class="card card-custom mb-4">
                 <div class="card-body">
                     <div class="row g-3 align-items-end">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label">Filtrar por Grupo</label>
+                            <div class="autocomplete-container">
+                                <input type="text" id="input-grupo-compras" class="form-control" placeholder="Todos os grupos...">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label">Cobertura Alvo (dias)</label>
                             <input type="number" id="input-cobertura" class="form-control" value="45">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label">Margem de Segurança (%)</label>
                             <input type="number" id="input-margem" class="form-control" value="20">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <button class="btn btn-primary-custom w-100" onclick="gerarListaCompras()">
                                 <i class="bi bi-cart-plus"></i> Gerar Lista
                             </button>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i> Deixe o grupo vazio para ver todos os itens, ou selecione um grupo específico da lista.
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -1542,6 +1555,7 @@
         async function gerarListaCompras() {
             const dias = parseInt(document.getElementById('input-cobertura').value);
             const margem = parseInt(document.getElementById('input-margem').value);
+            const grupoFiltro = document.getElementById('input-grupo-compras').value.trim();
 
             document.getElementById('loading-compras').classList.add('show');
 
@@ -1549,7 +1563,7 @@
                 const response = await fetch('/api/lista-compras', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dias_cobertura: dias, margem: margem })
+                    body: JSON.stringify({ dias_cobertura: dias, margem: margem, grupo: grupoFiltro })
                 });
                 const data = await response.json();
 
@@ -2860,6 +2874,7 @@
             setTimeout(() => {
                 initConferenciaAutocomplete();
                 initBuscaAutocomplete();
+                initGrupoComprasAutocomplete();
             }, 1000);
         });
 
@@ -2870,6 +2885,167 @@
                 document.getElementById('input-busca').value = item.nome;
                 buscarItem();
             });
+        }
+
+        // Autocomplete para filtro de grupo na lista de compras
+        function initGrupoComprasAutocomplete() {
+            criarAutocompleteGrupo('input-grupo-compras', (grupo) => {
+                // Ao selecionar grupo, pode gerar lista automaticamente se desejar
+                console.log('Grupo selecionado:', grupo);
+            });
+        }
+
+        // Função de autocomplete específica para grupos
+        function criarAutocompleteGrupo(inputId, onSelect) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            const container = input.parentElement;
+            container.classList.add('autocomplete-container');
+
+            let listId = inputId + '-autocomplete';
+            let list = document.getElementById(listId);
+            if (!list) {
+                list = document.createElement('div');
+                list.id = listId;
+                list.className = 'autocomplete-list';
+                container.appendChild(list);
+            }
+
+            let selectedIndex = -1;
+
+            input.addEventListener('input', function() {
+                const termo = this.value.trim().toUpperCase();
+                selectedIndex = -1;
+
+                if (termo.length < 1) {
+                    // Mostrar todos os grupos quando campo vazio e focado
+                    const resultados = gruposCache.slice(0, 15);
+                    mostrarListaGrupos(resultados, list, input, onSelect);
+                    return;
+                }
+
+                // Filtrar grupos que começam com o termo
+                let resultados = gruposCache.filter(g =>
+                    g.toUpperCase().startsWith(termo)
+                ).slice(0, 10);
+
+                // Adicionar grupos que contêm o termo
+                const contem = gruposCache.filter(g =>
+                    g.toUpperCase().includes(termo) &&
+                    !g.toUpperCase().startsWith(termo)
+                ).slice(0, 5);
+                resultados = [...resultados, ...contem];
+
+                mostrarListaGrupos(resultados, list, input, onSelect);
+            });
+
+            // Mostrar lista ao focar no campo
+            input.addEventListener('focus', function() {
+                if (this.value.trim() === '') {
+                    const resultados = gruposCache.slice(0, 15);
+                    mostrarListaGrupos(resultados, list, input, onSelect);
+                }
+            });
+
+            // Validação ao sair do campo
+            input.addEventListener('blur', function() {
+                setTimeout(() => {
+                    list.classList.remove('show');
+                    const valor = this.value.trim();
+
+                    if (valor === '') {
+                        input.classList.remove('is-valid', 'is-invalid');
+                        return;
+                    }
+
+                    // Verifica se o valor corresponde a um grupo existente
+                    const grupoExistente = gruposCache.find(g => g.toUpperCase() === valor.toUpperCase());
+
+                    if (grupoExistente) {
+                        input.value = grupoExistente;
+                        input.classList.remove('is-invalid');
+                        input.classList.add('is-valid');
+                    } else {
+                        input.classList.remove('is-valid');
+                        input.classList.add('is-invalid');
+                    }
+                }, 200);
+            });
+
+            // Navegação com teclado
+            input.addEventListener('keydown', function(e) {
+                const items = list.querySelectorAll('.autocomplete-item[data-grupo]');
+                if (!list.classList.contains('show')) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (items.length > 0) {
+                        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                        list.querySelectorAll('.autocomplete-item').forEach((el, i) => el.classList.toggle('selected', i === selectedIndex));
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (items.length > 0) {
+                        selectedIndex = Math.max(selectedIndex - 1, 0);
+                        list.querySelectorAll('.autocomplete-item').forEach((el, i) => el.classList.toggle('selected', i === selectedIndex));
+                    }
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (selectedIndex >= 0 && items[selectedIndex]) {
+                        items[selectedIndex].click();
+                    } else if (items.length === 1) {
+                        items[0].click();
+                    }
+                } else if (e.key === 'Escape') {
+                    list.classList.remove('show');
+                } else if (e.key === 'Tab' && items.length > 0 && selectedIndex < 0) {
+                    e.preventDefault();
+                    items[0].click();
+                }
+            });
+
+            // Fechar ao clicar fora
+            document.addEventListener('click', function(e) {
+                if (!container.contains(e.target)) {
+                    list.classList.remove('show');
+                }
+            });
+
+            // Botão para limpar filtro
+            input.addEventListener('dblclick', function() {
+                this.value = '';
+                this.classList.remove('is-valid', 'is-invalid');
+            });
+        }
+
+        function mostrarListaGrupos(resultados, list, input, onSelect) {
+            if (resultados.length > 0) {
+                list.innerHTML = resultados.map((grupo, idx) => `
+                    <div class="autocomplete-item" data-index="${idx}" data-grupo="${grupo}">
+                        <div>
+                            <div class="item-nome"><i class="bi bi-folder"></i> ${grupo}</div>
+                        </div>
+                    </div>
+                `).join('');
+
+                list.querySelectorAll('.autocomplete-item').forEach(el => {
+                    el.addEventListener('click', function() {
+                        input.value = this.dataset.grupo;
+                        input.classList.remove('is-invalid');
+                        input.classList.add('is-valid');
+                        list.classList.remove('show');
+                        if (onSelect) {
+                            onSelect(this.dataset.grupo);
+                        }
+                    });
+                });
+
+                list.classList.add('show');
+            } else {
+                list.innerHTML = '<div class="autocomplete-item text-danger"><i class="bi bi-exclamation-triangle"></i> Grupo não encontrado</div>';
+                list.classList.add('show');
+            }
         }
     </script>
 </body>

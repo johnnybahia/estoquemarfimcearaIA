@@ -387,8 +387,13 @@ def api_lista_compras():
     try:
         dias_cobertura = request.json.get('dias_cobertura', 45)
         margem = request.json.get('margem', 20) / 100
+        grupo_filtro = request.json.get('grupo', '').strip()
 
         df_idx, _ = carregar_dados_completos()
+
+        # Filtrar por grupo se especificado
+        if grupo_filtro:
+            df_idx = df_idx[df_idx['Grupo'].str.upper() == grupo_filtro.upper()]
 
         # Filtrar itens que precisam de reposição
         df_compras = df_idx[
