@@ -305,6 +305,96 @@
             display: block;
         }
 
+        /* Autocomplete */
+        .autocomplete-container {
+            position: relative;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1050;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .autocomplete-list.show {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .autocomplete-item:hover, .autocomplete-item.selected {
+            background: #f8f9fa;
+        }
+
+        .autocomplete-item .item-nome {
+            font-weight: 500;
+        }
+
+        .autocomplete-item .item-info {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .autocomplete-item .item-grupo {
+            font-size: 0.75rem;
+            color: #999;
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        /* Movimentação */
+        .mov-item-row {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .mov-item-row.item-novo {
+            border-left: 4px solid var(--warning);
+        }
+
+        .mov-item-row.item-existente {
+            border-left: 4px solid var(--success);
+        }
+
+        .btn-remove-item {
+            color: var(--danger);
+            cursor: pointer;
+        }
+
+        /* Tabs movimentação */
+        .nav-tabs-custom .nav-link {
+            border: none;
+            color: #666;
+            padding: 12px 25px;
+            font-weight: 500;
+        }
+
+        .nav-tabs-custom .nav-link.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--accent);
+            background: transparent;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .sidebar {
@@ -340,6 +430,12 @@
             </div>
             <div class="nav-item" data-page="chat">
                 <i class="bi bi-robot"></i> Assistente IA
+            </div>
+            <div class="nav-item" data-page="movimentacao">
+                <i class="bi bi-arrow-left-right"></i> Movimentação
+            </div>
+            <div class="nav-item" data-page="parados">
+                <i class="bi bi-clock-history"></i> Itens Parados
             </div>
             <div class="nav-item" data-page="relatorios">
                 <i class="bi bi-bar-chart"></i> Relatórios
@@ -777,6 +873,193 @@
             <div class="loading" id="loading-relatorios">
                 <div class="spinner"></div>
                 <p>Carregando relatório...</p>
+            </div>
+        </div>
+
+        <!-- Movimentação -->
+        <div id="page-movimentacao" class="page-section">
+            <div class="page-header">
+                <h2><i class="bi bi-arrow-left-right"></i> Movimentação de Estoque</h2>
+            </div>
+
+            <!-- Tabs Entrada/Saída -->
+            <ul class="nav nav-tabs nav-tabs-custom mb-4" id="tabMovimentacao">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#tab-entrada">
+                        <i class="bi bi-box-arrow-in-down text-success"></i> Entrada
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#tab-saida">
+                        <i class="bi bi-box-arrow-up text-danger"></i> Saída
+                    </a>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- Tab Entrada -->
+                <div class="tab-pane fade show active" id="tab-entrada">
+                    <div class="card card-custom mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-box-arrow-in-down text-success"></i> Registrar Entrada</span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary me-2" onclick="adicionarLinhaItem('entrada')">
+                                    <i class="bi bi-plus"></i> Adicionar Item
+                                </button>
+                                <button class="btn btn-sm btn-success" onclick="confirmarMovimentacao('entrada')">
+                                    <i class="bi bi-check-lg"></i> Confirmar Entrada
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">NF / Pedido</label>
+                                    <input type="text" id="entrada-nf" class="form-control" placeholder="Número da NF ou Pedido">
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label">Observação Geral</label>
+                                    <input type="text" id="entrada-obs" class="form-control" placeholder="Observação (opcional)">
+                                </div>
+                            </div>
+                            <hr>
+                            <div id="itens-entrada">
+                                <!-- Linhas de itens serão adicionadas aqui -->
+                            </div>
+                            <div class="text-center py-4" id="entrada-vazio">
+                                <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-2">Clique em "Adicionar Item" para começar</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Saída -->
+                <div class="tab-pane fade" id="tab-saida">
+                    <div class="card card-custom mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-box-arrow-up text-danger"></i> Registrar Saída</span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary me-2" onclick="adicionarLinhaItem('saida')">
+                                    <i class="bi bi-plus"></i> Adicionar Item
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="confirmarMovimentacao('saida')">
+                                    <i class="bi bi-check-lg"></i> Confirmar Saída
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">NF / Pedido</label>
+                                    <input type="text" id="saida-nf" class="form-control" placeholder="Número da NF ou Pedido">
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label">Observação Geral</label>
+                                    <input type="text" id="saida-obs" class="form-control" placeholder="Observação (opcional)">
+                                </div>
+                            </div>
+                            <hr>
+                            <div id="itens-saida">
+                                <!-- Linhas de itens serão adicionadas aqui -->
+                            </div>
+                            <div class="text-center py-4" id="saida-vazio">
+                                <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-2">Clique em "Adicionar Item" para começar</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resultado da movimentação -->
+            <div id="resultado-movimentacao" style="display: none;"></div>
+        </div>
+
+        <!-- Itens Parados -->
+        <div id="page-parados" class="page-section">
+            <div class="page-header">
+                <h2><i class="bi bi-clock-history"></i> Itens Sem Movimentação</h2>
+            </div>
+
+            <div class="card card-custom mb-4">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Sem movimentação há mais de:</label>
+                            <div class="input-group">
+                                <input type="number" id="input-dias-parado" class="form-control" value="20" min="1">
+                                <span class="input-group-text">dias</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary-custom w-100" onclick="carregarItensParados()">
+                                <i class="bi bi-search"></i> Buscar Itens Parados
+                            </button>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-outline-success w-100" onclick="exportarItensParados()">
+                                <i class="bi bi-download"></i> CSV
+                            </button>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary-custom w-100" onclick="analisarItensParadosIA()">
+                                <i class="bi bi-robot"></i> Analisar IA
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Análise IA dos itens parados -->
+            <div id="analise-parados-ia" class="mb-4" style="display: none;"></div>
+
+            <div class="row g-3 mb-4" id="resumo-parados" style="display: none;">
+                <div class="col-md-6">
+                    <div class="kpi-card">
+                        <div class="value" id="parados-total">0</div>
+                        <div class="label">Itens Parados</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="kpi-card">
+                        <div class="value" id="parados-dias">0</div>
+                        <div class="label">Dias de Filtro</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card card-custom">
+                <div class="card-header">
+                    <i class="bi bi-list"></i> Itens Sem Movimentação
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-custom" id="table-parados">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Grupo</th>
+                                    <th>Saldo</th>
+                                    <th>Última Movimentação</th>
+                                    <th>Dias Parado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        Selecione o período e clique em "Buscar Itens Parados"
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading-parados">
+                <div class="spinner"></div>
+                <p>Buscando itens parados...</p>
             </div>
         </div>
 
@@ -1372,10 +1655,613 @@
         }
 
         // ============================================================
+        // AUTOCOMPLETE
+        // ============================================================
+        let listaItensCache = [];
+        let gruposCache = [];
+
+        async function carregarCacheItens() {
+            try {
+                const response = await fetch('/api/autocomplete?limite=5000');
+                const data = await response.json();
+                if (data.success) {
+                    listaItensCache = data.itens;
+                }
+            } catch (e) {
+                console.error('Erro ao carregar cache de itens:', e);
+            }
+        }
+
+        async function carregarCacheGrupos() {
+            try {
+                const response = await fetch('/api/grupos');
+                const data = await response.json();
+                if (data.success) {
+                    gruposCache = data.grupos;
+                }
+            } catch (e) {
+                console.error('Erro ao carregar cache de grupos:', e);
+            }
+        }
+
+        function criarAutocomplete(inputId, onSelect) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            const container = input.parentElement;
+            container.classList.add('autocomplete-container');
+
+            // Criar lista de sugestões
+            let listId = inputId + '-autocomplete';
+            let list = document.getElementById(listId);
+            if (!list) {
+                list = document.createElement('div');
+                list.id = listId;
+                list.className = 'autocomplete-list';
+                container.appendChild(list);
+            }
+
+            let selectedIndex = -1;
+
+            input.addEventListener('input', async function() {
+                const termo = this.value.trim().toUpperCase();
+                selectedIndex = -1;
+
+                if (termo.length < 1) {
+                    list.classList.remove('show');
+                    return;
+                }
+
+                // Filtrar do cache local primeiro
+                let resultados = listaItensCache.filter(item =>
+                    item.nome.toUpperCase().startsWith(termo)
+                ).slice(0, 10);
+
+                // Adicionar itens que contêm o termo
+                const contem = listaItensCache.filter(item =>
+                    item.nome.toUpperCase().includes(termo) &&
+                    !item.nome.toUpperCase().startsWith(termo)
+                ).slice(0, 5);
+                resultados = [...resultados, ...contem];
+
+                if (resultados.length === 0 && termo.length >= 2) {
+                    // Buscar da API se não encontrou no cache
+                    try {
+                        const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(termo)}&limite=15`);
+                        const data = await response.json();
+                        if (data.success) {
+                            resultados = data.itens;
+                        }
+                    } catch (e) {
+                        console.error('Erro autocomplete:', e);
+                    }
+                }
+
+                if (resultados.length > 0) {
+                    list.innerHTML = resultados.map((item, idx) => `
+                        <div class="autocomplete-item" data-index="${idx}" data-nome="${item.nome}" data-grupo="${item.grupo || ''}" data-saldo="${item.saldo}">
+                            <div>
+                                <div class="item-nome">${item.nome}</div>
+                                <div class="item-info">Saldo: ${item.saldo.toLocaleString('pt-BR')}</div>
+                            </div>
+                            ${item.grupo ? `<span class="item-grupo">${item.grupo}</span>` : ''}
+                        </div>
+                    `).join('');
+
+                    list.querySelectorAll('.autocomplete-item').forEach(el => {
+                        el.addEventListener('click', function() {
+                            input.value = this.dataset.nome;
+                            list.classList.remove('show');
+                            if (onSelect) {
+                                onSelect({
+                                    nome: this.dataset.nome,
+                                    grupo: this.dataset.grupo,
+                                    saldo: parseFloat(this.dataset.saldo)
+                                });
+                            }
+                        });
+                    });
+
+                    list.classList.add('show');
+                } else {
+                    list.innerHTML = '<div class="autocomplete-item text-muted">Nenhum item encontrado - será cadastrado como novo</div>';
+                    list.classList.add('show');
+                }
+            });
+
+            // Navegação com teclado
+            input.addEventListener('keydown', function(e) {
+                const items = list.querySelectorAll('.autocomplete-item');
+                if (!list.classList.contains('show') || items.length === 0) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                    items.forEach((el, i) => el.classList.toggle('selected', i === selectedIndex));
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = Math.max(selectedIndex - 1, 0);
+                    items.forEach((el, i) => el.classList.toggle('selected', i === selectedIndex));
+                } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                    e.preventDefault();
+                    items[selectedIndex].click();
+                } else if (e.key === 'Escape') {
+                    list.classList.remove('show');
+                }
+            });
+
+            // Fechar ao clicar fora
+            document.addEventListener('click', function(e) {
+                if (!container.contains(e.target)) {
+                    list.classList.remove('show');
+                }
+            });
+        }
+
+        // ============================================================
+        // MOVIMENTAÇÃO
+        // ============================================================
+        let contadorLinhaEntrada = 0;
+        let contadorLinhaSaida = 0;
+
+        function adicionarLinhaItem(tipo) {
+            const container = document.getElementById(`itens-${tipo}`);
+            const vazio = document.getElementById(`${tipo}-vazio`);
+            vazio.style.display = 'none';
+
+            const contador = tipo === 'entrada' ? ++contadorLinhaEntrada : ++contadorLinhaSaida;
+            const id = `${tipo}-item-${contador}`;
+
+            const html = `
+                <div class="mov-item-row" id="${id}">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label">Item</label>
+                            <div class="autocomplete-container">
+                                <input type="text" id="${id}-nome" class="form-control item-nome-input" placeholder="Digite o nome do item...">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Quantidade</label>
+                            <input type="number" id="${id}-qtd" class="form-control" placeholder="0" min="0" step="0.01">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Grupo <span id="${id}-grupo-status"></span></label>
+                            <select id="${id}-grupo" class="form-select">
+                                <option value="">Selecione...</option>
+                                ${gruposCache.map(g => `<option value="${g}">${g}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-md-2 text-end">
+                            <button class="btn btn-outline-danger" onclick="removerLinhaItem('${id}', '${tipo}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <input type="hidden" id="${id}-item-novo" value="false">
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', html);
+
+            // Configurar autocomplete para o novo campo
+            criarAutocomplete(`${id}-nome`, (item) => {
+                const grupoSelect = document.getElementById(`${id}-grupo`);
+                const grupoStatus = document.getElementById(`${id}-grupo-status`);
+                const itemNovo = document.getElementById(`${id}-item-novo`);
+                const row = document.getElementById(id);
+
+                if (item.grupo) {
+                    grupoSelect.value = item.grupo;
+                    grupoSelect.disabled = true;
+                    grupoStatus.innerHTML = '<span class="badge bg-success">Detectado</span>';
+                    itemNovo.value = 'false';
+                    row.classList.remove('item-novo');
+                    row.classList.add('item-existente');
+                } else {
+                    buscarGrupoItem(`${id}-nome`, `${id}-grupo`, `${id}-grupo-status`, id, `${id}-item-novo`);
+                }
+            });
+        }
+
+        async function buscarGrupoItem(nomeInputId, grupoSelectId, statusId, rowId, itemNovoId) {
+            const nome = document.getElementById(nomeInputId).value.trim();
+            const grupoSelect = document.getElementById(grupoSelectId);
+            const status = document.getElementById(statusId);
+            const row = document.getElementById(rowId);
+            const itemNovo = document.getElementById(itemNovoId);
+
+            if (!nome) return;
+
+            try {
+                const response = await fetch(`/api/buscar-grupo?item=${encodeURIComponent(nome)}`);
+                const data = await response.json();
+
+                if (data.success && data.encontrado) {
+                    grupoSelect.value = data.grupo;
+                    grupoSelect.disabled = true;
+                    status.innerHTML = '<span class="badge bg-success">Detectado</span>';
+                    itemNovo.value = 'false';
+                    row.classList.remove('item-novo');
+                    row.classList.add('item-existente');
+                } else {
+                    grupoSelect.disabled = false;
+                    status.innerHTML = '<span class="badge bg-warning">Item Novo - Selecione</span>';
+                    itemNovo.value = 'true';
+                    row.classList.remove('item-existente');
+                    row.classList.add('item-novo');
+                }
+            } catch (e) {
+                console.error('Erro ao buscar grupo:', e);
+            }
+        }
+
+        function removerLinhaItem(id, tipo) {
+            document.getElementById(id).remove();
+            const container = document.getElementById(`itens-${tipo}`);
+            if (container.children.length === 0) {
+                document.getElementById(`${tipo}-vazio`).style.display = 'block';
+            }
+        }
+
+        async function confirmarMovimentacao(tipo) {
+            const container = document.getElementById(`itens-${tipo}`);
+            const linhas = container.querySelectorAll('.mov-item-row');
+
+            if (linhas.length === 0) {
+                alert('Adicione pelo menos um item');
+                return;
+            }
+
+            const nf = document.getElementById(`${tipo}-nf`).value.trim();
+            const obs = document.getElementById(`${tipo}-obs`).value.trim();
+
+            const itens = [];
+            let temErro = false;
+
+            linhas.forEach(linha => {
+                const id = linha.id;
+                const nome = document.getElementById(`${id}-nome`).value.trim();
+                const qtd = parseFloat(document.getElementById(`${id}-qtd`).value) || 0;
+                const grupo = document.getElementById(`${id}-grupo`).value;
+                const itemNovo = document.getElementById(`${id}-item-novo`).value === 'true';
+
+                if (!nome) {
+                    alert('Preencha o nome do item');
+                    temErro = true;
+                    return;
+                }
+                if (qtd <= 0) {
+                    alert(`Quantidade inválida para o item: ${nome}`);
+                    temErro = true;
+                    return;
+                }
+                if (itemNovo && !grupo) {
+                    alert(`Selecione o grupo para o item novo: ${nome}`);
+                    temErro = true;
+                    return;
+                }
+
+                itens.push({
+                    item: nome,
+                    quantidade: qtd,
+                    nf: nf,
+                    obs: obs,
+                    grupo: grupo
+                });
+            });
+
+            if (temErro) return;
+
+            // Confirmação
+            const tipoTexto = tipo === 'entrada' ? 'ENTRADA' : 'SAÍDA';
+            const confirmMsg = `Confirmar ${tipoTexto} de ${itens.length} item(s)?\\n\\n` +
+                itens.map(i => `- ${i.item}: ${i.quantidade}`).join('\\n');
+
+            // Validar com IA primeiro
+            const resultado = document.getElementById('resultado-movimentacao');
+            resultado.style.display = 'block';
+            resultado.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="spinner-border spinner-border-sm me-2"></div>
+                    <i class="bi bi-robot"></i> IA analisando movimentação...
+                </div>
+            `;
+
+            try {
+                const validacaoResp = await fetch('/api/validar-movimentacao', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tipo, itens })
+                });
+                const validacao = await validacaoResp.json();
+
+                if (validacao.success && validacao.validacao) {
+                    resultado.innerHTML = `
+                        <div class="card card-custom mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <i class="bi bi-robot"></i> Validação da IA
+                            </div>
+                            <div class="card-body">
+                                <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">${validacao.validacao}</pre>
+                                ${validacao.alertas && validacao.alertas.length > 0 ? `
+                                    <hr>
+                                    <strong>Alertas:</strong>
+                                    <ul class="mb-0">${validacao.alertas.map(a => `<li class="text-warning">${a}</li>`).join('')}</ul>
+                                ` : ''}
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-success me-2" onclick="executarMovimentacao('${tipo}')">
+                                    <i class="bi bi-check-lg"></i> Confirmar ${tipoTexto}
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="document.getElementById('resultado-movimentacao').style.display='none'">
+                                    <i class="bi bi-x"></i> Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    // Salvar itens para confirmação posterior
+                    window.itensParaConfirmar = { tipo, itens };
+                    return;
+                }
+            } catch (e) {
+                console.log('IA não disponível, continuando sem validação:', e);
+            }
+
+            // Se IA não validou, pedir confirmação normal
+            if (!confirm(confirmMsg)) {
+                resultado.style.display = 'none';
+                return;
+            }
+
+            // Enviar para API
+            const resultado = document.getElementById('resultado-movimentacao');
+            resultado.style.display = 'block';
+            resultado.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="spinner-border spinner-border-sm me-2"></div>
+                    Registrando ${tipoTexto.toLowerCase()}...
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/movimentacao', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tipo, itens })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    let html = `
+                        <div class="alert alert-success">
+                            <h5><i class="bi bi-check-circle"></i> ${tipoTexto} Registrada!</h5>
+                            <p>${data.resumo.sucessos} de ${data.resumo.total} itens registrados com sucesso.</p>
+                        </div>
+                    `;
+
+                    if (data.resumo.erros > 0) {
+                        html += `<div class="alert alert-warning"><strong>Erros:</strong><ul>`;
+                        data.resultados.filter(r => !r.sucesso).forEach(r => {
+                            html += `<li>${r.item}: ${r.erro}</li>`;
+                        });
+                        html += `</ul></div>`;
+                    }
+
+                    resultado.innerHTML = html;
+
+                    // Limpar campos
+                    container.innerHTML = '';
+                    document.getElementById(`${tipo}-vazio`).style.display = 'block';
+                    document.getElementById(`${tipo}-nf`).value = '';
+                    document.getElementById(`${tipo}-obs`).value = '';
+
+                    // Recarregar cache
+                    carregarCacheItens();
+                } else {
+                    resultado.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro: ${data.error}</div>`;
+                }
+            } catch (e) {
+                resultado.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro de conexão: ${e.message}</div>`;
+            }
+        }
+
+        // Executar movimentação após validação IA
+        async function executarMovimentacao(tipo) {
+            if (!window.itensParaConfirmar || window.itensParaConfirmar.tipo !== tipo) {
+                alert('Erro: dados de movimentação não encontrados');
+                return;
+            }
+
+            const { itens } = window.itensParaConfirmar;
+            const tipoTexto = tipo === 'entrada' ? 'ENTRADA' : 'SAÍDA';
+            const resultado = document.getElementById('resultado-movimentacao');
+
+            resultado.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="spinner-border spinner-border-sm me-2"></div>
+                    Registrando ${tipoTexto.toLowerCase()}...
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/movimentacao', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tipo, itens })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    let html = `
+                        <div class="alert alert-success">
+                            <h5><i class="bi bi-check-circle"></i> ${tipoTexto} Registrada com Sucesso!</h5>
+                            <p>${data.resumo.sucessos} de ${data.resumo.total} itens registrados.</p>
+                        </div>
+                    `;
+
+                    if (data.resumo.erros > 0) {
+                        html += `<div class="alert alert-warning"><strong>Erros:</strong><ul>`;
+                        data.resultados.filter(r => !r.sucesso).forEach(r => {
+                            html += `<li>${r.item}: ${r.erro}</li>`;
+                        });
+                        html += `</ul></div>`;
+                    }
+
+                    resultado.innerHTML = html;
+
+                    // Limpar campos
+                    const container = document.getElementById(`itens-${tipo}`);
+                    container.innerHTML = '';
+                    document.getElementById(`${tipo}-vazio`).style.display = 'block';
+                    document.getElementById(`${tipo}-nf`).value = '';
+                    document.getElementById(`${tipo}-obs`).value = '';
+                    window.itensParaConfirmar = null;
+
+                    // Recarregar cache
+                    carregarCacheItens();
+                } else {
+                    resultado.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro: ${data.error}</div>`;
+                }
+            } catch (e) {
+                resultado.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro de conexão: ${e.message}</div>`;
+            }
+        }
+
+        // ============================================================
+        // ITENS PARADOS
+        // ============================================================
+        let listaParadosData = [];
+
+        async function carregarItensParados() {
+            const dias = parseInt(document.getElementById('input-dias-parado').value) || 20;
+
+            document.getElementById('loading-parados').classList.add('show');
+
+            try {
+                const response = await fetch(`/api/itens-parados?dias=${dias}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    listaParadosData = data.itens;
+
+                    document.getElementById('resumo-parados').style.display = 'flex';
+                    document.getElementById('parados-total').textContent = data.total.toLocaleString('pt-BR');
+                    document.getElementById('parados-dias').textContent = data.dias_filtro;
+
+                    const tbody = document.querySelector('#table-parados tbody');
+                    if (data.itens.length > 0) {
+                        tbody.innerHTML = data.itens.map(item => `
+                            <tr>
+                                <td><strong>${item.nome}</strong></td>
+                                <td>${item.grupo || '-'}</td>
+                                <td>${item.saldo.toLocaleString('pt-BR')}</td>
+                                <td>${item.ultima_mov}</td>
+                                <td>
+                                    <span class="badge ${typeof item.dias_parado === 'number' && item.dias_parado > 60 ? 'bg-danger' : 'bg-warning'}">
+                                        ${typeof item.dias_parado === 'number' ? item.dias_parado + ' dias' : item.dias_parado}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('');
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-success py-4"><i class="bi bi-check-circle"></i> Nenhum item parado encontrado!</td></tr>';
+                    }
+                } else {
+                    alert('Erro: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Erro:', e);
+                alert('Erro ao carregar itens parados');
+            }
+
+            document.getElementById('loading-parados').classList.remove('show');
+        }
+
+        function exportarItensParados() {
+            if (!listaParadosData.length) {
+                alert('Busque os itens primeiro!');
+                return;
+            }
+
+            let csv = 'Item,Grupo,Saldo,Ultima Movimentacao,Dias Parado\\n';
+            listaParadosData.forEach(item => {
+                csv += `"${item.nome}","${item.grupo || ''}",${item.saldo},"${item.ultima_mov}","${item.dias_parado}"\\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'itens_parados_' + new Date().toISOString().slice(0,10) + '.csv';
+            a.click();
+        }
+
+        async function analisarItensParadosIA() {
+            if (!listaParadosData.length) {
+                alert('Busque os itens primeiro!');
+                return;
+            }
+
+            const container = document.getElementById('analise-parados-ia');
+            container.style.display = 'block';
+            container.innerHTML = `
+                <div class="card card-custom">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-robot"></i> Análise Inteligente - Itens Parados
+                    </div>
+                    <div class="card-body text-center py-4">
+                        <div class="spinner"></div>
+                        <p>IA analisando ${listaParadosData.length} itens parados...</p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/analisar-parados', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itens: listaParadosData })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    container.innerHTML = `
+                        <div class="card card-custom">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-robot"></i> Análise Inteligente - ${data.total_analisados} Itens</span>
+                                <button class="btn btn-sm btn-outline-light" onclick="document.getElementById('analise-parados-ia').style.display='none'">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">${data.analise}</pre>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="bi bi-x-circle"></i> Erro: ${data.error}
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                container.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle"></i> Erro de conexão: ${e.message}
+                    </div>
+                `;
+            }
+        }
+
+        // ============================================================
         // INIT
         // ============================================================
         document.addEventListener('DOMContentLoaded', () => {
             carregarDashboard();
+            carregarCacheItens();
+            carregarCacheGrupos();
         });
     </script>
 </body>
