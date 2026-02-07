@@ -680,6 +680,63 @@ def api_buscar_grupo():
         return jsonify({'success': False, 'error': str(e)})
 
 
+@app.route('/api/ultimo-valor-item', methods=['GET'])
+def api_ultimo_valor_item():
+    """Busca o último valor unitário de um item"""
+    try:
+        item_nome = request.args.get('item', '').strip()
+
+        if not item_nome:
+            return jsonify({'success': False, 'error': 'Nome do item não informado'})
+
+        _, df_hist = carregar_dados_completos()
+
+        # Buscar histórico do item
+        hist_item = df_hist[df_hist['Item'].str.upper() == item_nome.upper()]
+
+        if hist_item.empty:
+            return jsonify({
+                'success': True,
+                'valor_unitario': 0,
+                'data_ultimo': None
+            })
+
+        # Encontrar coluna de valor unitário
+        col_valor = encontrar_coluna(df_hist, ['Valor Unitário', 'Val.Unit', 'ValUnit', 'Preco', 'Valor'])
+
+        if not col_valor:
+            return jsonify({
+                'success': True,
+                'valor_unitario': 0,
+                'data_ultimo': None
+            })
+
+        # Pegar o último registro com valor > 0
+        hist_item_com_valor = hist_item[hist_item[col_valor].apply(converter_para_numero) > 0]
+
+        if hist_item_com_valor.empty:
+            return jsonify({
+                'success': True,
+                'valor_unitario': 0,
+                'data_ultimo': None
+            })
+
+        ultimo = hist_item_com_valor.iloc[-1]
+        valor = converter_para_numero(ultimo[col_valor])
+
+        # Pegar data
+        col_data = encontrar_coluna(df_hist, ['Data', 'DATA', 'data'])
+        data_ultimo = str(ultimo[col_data]) if col_data else None
+
+        return jsonify({
+            'success': True,
+            'valor_unitario': valor,
+            'data_ultimo': data_ultimo
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 @app.route('/api/grupos', methods=['GET'])
 def api_grupos():
     """Retorna lista de grupos disponíveis"""
@@ -889,7 +946,7 @@ def api_movimentacao():
     try:
         dados = request.json
         tipo = dados.get('tipo', '')  # 'entrada' ou 'saida'
-        itens = dados.get('itens', [])  # Lista de {item, quantidade, nf, obs, grupo}
+        itens = dados.get('itens', [])  # Lista de {item, quantidade, nf, obs, grupo, unidade, saldo_atual, novo_saldo, valor_unitario}
 
         if tipo not in ['entrada', 'saida']:
             return jsonify({'success': False, 'error': 'Tipo deve ser "entrada" ou "saida"'})
@@ -906,23 +963,21 @@ def api_movimentacao():
 
         # Identificar colunas da planilha ESTOQUE
         colunas_hist = sheet_hist.row_values(1)
-        col_grupo = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Grupo', 'GRUPO'])
-        col_item = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Item', 'ITEM'])
-        col_data = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Data', 'DATA'])
-        col_nf = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['NF', 'Nota', 'NOTA'])
-        col_obs = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Obs', 'OBS', 'Observação', 'OBSERVAÇÃO'])
-        col_entrada = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Entrada', 'ENTRADA'])
-        col_saida = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Saída', 'SAÍDA', 'Saida', 'SAIDA'])
 
         resultados = []
         data_atual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
         for item_info in itens:
-            item_nome = item_info.get('item', '').strip()
+            item_nome = item_info.get('item', '').strip().upper()
             quantidade = float(item_info.get('quantidade', 0))
             nf = item_info.get('nf', '')
             obs = item_info.get('obs', '')
             grupo = item_info.get('grupo', '')
+            unidade = item_info.get('unidade', 'UN')
+            saldo_atual = float(item_info.get('saldo_atual', 0))
+            novo_saldo = float(item_info.get('novo_saldo', 0))
+            valor_unitario = float(item_info.get('valor_unitario', 0))
+            item_novo = item_info.get('item_novo', False)
 
             if not item_nome or quantidade <= 0:
                 resultados.append({
@@ -943,41 +998,88 @@ def api_movimentacao():
                 })
                 continue
 
-            # Buscar grupo do item existente
-            if not grupo and not item_existe.empty:
+            # Buscar dados do item existente
+            if not item_existe.empty:
                 col_grupo_idx = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo'])
-                if col_grupo_idx:
+                if col_grupo_idx and not grupo:
                     grupo = item_existe.iloc[0][col_grupo_idx]
+                # Atualizar saldo_atual e novo_saldo com dados reais do sistema
+                saldo_atual = float(item_existe.iloc[0].get('Saldo', 0))
+                if tipo == 'entrada':
+                    novo_saldo = saldo_atual + quantidade
+                else:
+                    novo_saldo = saldo_atual - quantidade
+
+            # Preparar valores de entrada e saída
+            entrada_valor = quantidade if tipo == 'entrada' else 0
+            saida_valor = quantidade if tipo == 'saida' else 0
 
             # Preparar linha para inserir
             nova_linha = [''] * len(colunas_hist)
 
             for i, col in enumerate(colunas_hist):
-                col_upper = col.upper()
+                col_upper = col.upper().strip()
                 if 'GRUPO' in col_upper:
                     nova_linha[i] = grupo
-                elif 'ITEM' in col_upper:
+                elif col_upper == 'ITEM':
                     nova_linha[i] = item_nome
-                elif 'DATA' in col_upper:
+                elif 'UNIDADE' in col_upper:
+                    nova_linha[i] = unidade
+                elif 'DATA' in col_upper and 'ALT' not in col_upper:
                     nova_linha[i] = data_atual
                 elif 'NF' in col_upper or 'NOTA' in col_upper:
                     nova_linha[i] = nf
                 elif 'OBS' in col_upper:
                     nova_linha[i] = obs
+                elif 'S.ANT' in col_upper or 'SALDO ANT' in col_upper or col_upper == 'S. ANT':
+                    nova_linha[i] = str(saldo_atual).replace('.', ',')
                 elif 'ENTRADA' in col_upper:
-                    nova_linha[i] = str(quantidade).replace('.', ',') if tipo == 'entrada' else ''
+                    nova_linha[i] = str(entrada_valor).replace('.', ',') if entrada_valor > 0 else ''
                 elif 'SAÍDA' in col_upper or 'SAIDA' in col_upper:
-                    nova_linha[i] = str(quantidade).replace('.', ',') if tipo == 'saida' else ''
+                    nova_linha[i] = str(saida_valor).replace('.', ',') if saida_valor > 0 else ''
+                elif col_upper == 'SALDO' or col_upper == 'SALDO ATUAL':
+                    nova_linha[i] = str(novo_saldo).replace('.', ',')
+                elif 'VAL' in col_upper and 'UNIT' in col_upper:
+                    nova_linha[i] = str(valor_unitario).replace('.', ',') if valor_unitario > 0 else ''
+                elif 'ALTEM' in col_upper or 'ALT EM' in col_upper or col_upper == 'ALT.EM':
+                    nova_linha[i] = data_atual
+                elif 'ALTPOR' in col_upper or 'ALT POR' in col_upper or col_upper == 'ALT.POR':
+                    nova_linha[i] = 'Sistema_Web'
 
-            # Inserir linha na planilha
-            sheet_hist.append_row(nova_linha)
+            # Inserir linha na planilha ESTOQUE
+            sheet_hist.append_row(nova_linha, value_input_option='USER_ENTERED')
+
+            # Atualizar ÍNDICE_ITENS com novo saldo e linha
+            try:
+                nova_linha_num = len(sheet_hist.get_all_values())
+
+                # Buscar linha do item no índice
+                dados_idx = sheet_idx.get_all_values()
+                for idx_linha, row in enumerate(dados_idx):
+                    if idx_linha == 0:
+                        continue  # Pular cabeçalho
+                    if row[0].upper() == item_nome.upper():
+                        # Atualizar Saldo (coluna B), Data (coluna C) e Linha ESTOQUE (coluna E)
+                        sheet_idx.update(f'B{idx_linha + 1}', str(novo_saldo).replace('.', ','))
+                        sheet_idx.update(f'C{idx_linha + 1}', data_atual)
+                        sheet_idx.update(f'E{idx_linha + 1}', nova_linha_num)
+                        break
+                else:
+                    # Item novo - adicionar ao índice
+                    if item_novo or item_existe.empty:
+                        nova_linha_idx = [item_nome, str(novo_saldo).replace('.', ','), data_atual, grupo, nova_linha_num]
+                        sheet_idx.append_row(nova_linha_idx, value_input_option='USER_ENTERED')
+            except Exception as e:
+                print(f"Erro ao atualizar índice: {e}")
 
             resultados.append({
                 'item': item_nome,
                 'sucesso': True,
                 'tipo': tipo,
                 'quantidade': quantidade,
-                'grupo': grupo
+                'grupo': grupo,
+                'saldo_anterior': saldo_atual,
+                'novo_saldo': novo_saldo
             })
 
         # Resumo

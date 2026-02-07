@@ -922,6 +922,9 @@
                                 <button class="btn btn-sm btn-outline-primary me-2" onclick="adicionarLinhaItem('entrada')">
                                     <i class="bi bi-plus"></i> Adicionar Item
                                 </button>
+                                <button class="btn btn-sm btn-outline-warning me-2" onclick="adicionarItemNovoManual('entrada')">
+                                    <i class="bi bi-plus-circle"></i> Item Novo
+                                </button>
                                 <button class="btn btn-sm btn-success" onclick="confirmarMovimentacao('entrada')">
                                     <i class="bi bi-check-lg"></i> Confirmar Entrada
                                 </button>
@@ -929,13 +932,22 @@
                         </div>
                         <div class="card-body">
                             <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <label class="form-label">NF / Pedido</label>
-                                    <input type="text" id="entrada-nf" class="form-control" placeholder="Número da NF ou Pedido">
+                                <div class="col-md-3">
+                                    <label class="form-label">NF / Pedido <span class="text-danger">*</span></label>
+                                    <input type="text" id="entrada-nf" class="form-control" placeholder="Obrigatório" required>
                                 </div>
-                                <div class="col-md-8">
-                                    <label class="form-label">Observação Geral</label>
-                                    <input type="text" id="entrada-obs" class="form-control" placeholder="Observação (opcional)">
+                                <div class="col-md-5">
+                                    <label class="form-label">Observação <span class="text-danger">*</span></label>
+                                    <input type="text" id="entrada-obs" class="form-control" placeholder="Obrigatório" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" id="entrada-com-nf" onchange="toggleEntradaNF()">
+                                        <label class="form-check-label" for="entrada-com-nf">
+                                            <i class="bi bi-receipt"></i> Entrada com NF (obriga informar valor unitário)
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                             <hr>
@@ -959,6 +971,9 @@
                                 <button class="btn btn-sm btn-outline-primary me-2" onclick="adicionarLinhaItem('saida')">
                                     <i class="bi bi-plus"></i> Adicionar Item
                                 </button>
+                                <button class="btn btn-sm btn-outline-warning me-2" onclick="adicionarItemNovoManual('saida')">
+                                    <i class="bi bi-plus-circle"></i> Item Novo
+                                </button>
                                 <button class="btn btn-sm btn-danger" onclick="confirmarMovimentacao('saida')">
                                     <i class="bi bi-check-lg"></i> Confirmar Saída
                                 </button>
@@ -967,12 +982,12 @@
                         <div class="card-body">
                             <div class="row mb-3">
                                 <div class="col-md-4">
-                                    <label class="form-label">NF / Pedido</label>
-                                    <input type="text" id="saida-nf" class="form-control" placeholder="Número da NF ou Pedido">
+                                    <label class="form-label">NF / Pedido <span class="text-danger">*</span></label>
+                                    <input type="text" id="saida-nf" class="form-control" placeholder="Obrigatório" required>
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label">Observação Geral</label>
-                                    <input type="text" id="saida-obs" class="form-control" placeholder="Observação (opcional)">
+                                    <label class="form-label">Observação <span class="text-danger">*</span></label>
+                                    <input type="text" id="saida-obs" class="form-control" placeholder="Obrigatório" required>
                                 </div>
                             </div>
                             <hr>
@@ -2069,37 +2084,62 @@
             const contador = tipo === 'entrada' ? ++contadorLinhaEntrada : ++contadorLinhaSaida;
             const id = `${tipo}-item-${contador}`;
 
+            // Verificar se é entrada com NF para mostrar campo de valor obrigatório
+            const entradaComNF = tipo === 'entrada' && document.getElementById('entrada-com-nf')?.checked;
+
             const html = `
                 <div class="mov-item-row" id="${id}">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-5">
-                            <label class="form-label">Item</label>
+                    <div class="row g-2 align-items-end mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Item <span class="text-danger">*</span></label>
                             <div class="autocomplete-container">
                                 <input type="text" id="${id}-nome" class="form-control item-nome-input" placeholder="Digite o nome do item...">
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Quantidade</label>
-                            <input type="number" id="${id}-qtd" class="form-control" placeholder="0" min="0" step="0.01">
-                        </div>
-                        <div class="col-md-3">
                             <label class="form-label">Grupo <span id="${id}-grupo-status"></span></label>
                             <select id="${id}-grupo" class="form-select">
                                 <option value="">Selecione...</option>
                                 ${gruposCache.map(g => `<option value="${g}">${g}</option>`).join('')}
                             </select>
                         </div>
-                        <div class="col-md-2 text-end">
-                            <button class="btn btn-outline-danger" onclick="removerLinhaItem('${id}', '${tipo}')">
+                        <div class="col-md-1">
+                            <label class="form-label">Unidade</label>
+                            <input type="text" id="${id}-unidade" class="form-control text-center" readonly placeholder="-">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Saldo Atual</label>
+                            <input type="text" id="${id}-saldo" class="form-control text-end" readonly placeholder="-">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Quantidade <span class="text-danger">*</span></label>
+                            <input type="number" id="${id}-qtd" class="form-control" placeholder="0" min="0" step="0.01">
+                        </div>
+                        <div class="col-md-1 text-end">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-outline-danger w-100" onclick="removerLinhaItem('${id}', '${tipo}')">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
                     </div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Valor Unitário (R$) ${tipo === 'entrada' ? '<span id="' + id + '-valor-obrig"></span>' : ''}</label>
+                            <input type="number" id="${id}-valor" class="form-control" placeholder="0,00" min="0" step="0.01" ${tipo === 'saida' ? 'readonly' : ''}>
+                        </div>
+                        <div class="col-md-9">
+                            <small class="text-muted" id="${id}-info"></small>
+                        </div>
+                    </div>
                     <input type="hidden" id="${id}-item-novo" value="false">
+                    <hr class="my-3">
                 </div>
             `;
 
             container.insertAdjacentHTML('beforeend', html);
+
+            // Atualizar indicador de valor obrigatório se entrada com NF
+            atualizarCampoValorObrigatorio(id, tipo);
 
             // Configurar autocomplete para o novo campo (allowNew = true para movimentação)
             criarAutocomplete(`${id}-nome`, (item) => {
@@ -2107,6 +2147,10 @@
                 const grupoStatus = document.getElementById(`${id}-grupo-status`);
                 const itemNovo = document.getElementById(`${id}-item-novo`);
                 const row = document.getElementById(id);
+                const unidadeInput = document.getElementById(`${id}-unidade`);
+                const saldoInput = document.getElementById(`${id}-saldo`);
+                const valorInput = document.getElementById(`${id}-valor`);
+                const infoSpan = document.getElementById(`${id}-info`);
 
                 if (item.grupo) {
                     grupoSelect.value = item.grupo;
@@ -2115,10 +2159,147 @@
                     itemNovo.value = 'false';
                     row.classList.remove('item-novo');
                     row.classList.add('item-existente');
+
+                    // Preencher unidade e saldo
+                    unidadeInput.value = item.unidade || 'UN';
+                    saldoInput.value = item.saldo?.toLocaleString('pt-BR') || '0';
+
+                    // Buscar último valor unitário do item
+                    buscarUltimoValorItem(item.nome, valorInput, infoSpan, tipo);
                 } else {
                     buscarGrupoItem(`${id}-nome`, `${id}-grupo`, `${id}-grupo-status`, id, `${id}-item-novo`);
                 }
             }, true); // allowNew = true - permite cadastrar item novo na movimentação
+        }
+
+        // Função para atualizar indicador de valor obrigatório
+        function atualizarCampoValorObrigatorio(id, tipo) {
+            if (tipo !== 'entrada') return;
+            const obrigSpan = document.getElementById(`${id}-valor-obrig`);
+            const valorInput = document.getElementById(`${id}-valor`);
+            const entradaComNF = document.getElementById('entrada-com-nf')?.checked;
+
+            if (obrigSpan) {
+                if (entradaComNF) {
+                    obrigSpan.innerHTML = '<span class="text-danger">*</span>';
+                    valorInput.readOnly = false;
+                    valorInput.placeholder = 'Obrigatório';
+                    valorInput.classList.add('border-warning');
+                } else {
+                    obrigSpan.innerHTML = '';
+                    valorInput.placeholder = 'Auto';
+                    valorInput.classList.remove('border-warning');
+                }
+            }
+        }
+
+        // Toggle para checkbox de entrada com NF
+        function toggleEntradaNF() {
+            // Atualizar todos os campos de valor existentes
+            const container = document.getElementById('itens-entrada');
+            const linhas = container.querySelectorAll('.mov-item-row');
+            linhas.forEach(linha => {
+                atualizarCampoValorObrigatorio(linha.id, 'entrada');
+            });
+        }
+
+        // Buscar último valor unitário do item
+        async function buscarUltimoValorItem(nomeItem, valorInput, infoSpan, tipo) {
+            try {
+                const response = await fetch(`/api/ultimo-valor-item?item=${encodeURIComponent(nomeItem)}`);
+                const data = await response.json();
+
+                if (data.success && data.valor_unitario > 0) {
+                    // Se for saída, sempre preenche automaticamente
+                    // Se for entrada sem NF, preenche automaticamente
+                    const entradaComNF = tipo === 'entrada' && document.getElementById('entrada-com-nf')?.checked;
+
+                    if (tipo === 'saida' || !entradaComNF) {
+                        valorInput.value = data.valor_unitario.toFixed(2);
+                    }
+
+                    infoSpan.innerHTML = `<i class="bi bi-info-circle"></i> Último valor: R$ ${data.valor_unitario.toFixed(2)} em ${data.data_ultimo || 'N/A'}`;
+                } else {
+                    infoSpan.innerHTML = '<i class="bi bi-exclamation-triangle text-warning"></i> Nenhum valor anterior encontrado';
+                }
+            } catch (e) {
+                console.error('Erro ao buscar valor:', e);
+            }
+        }
+
+        // Função para adicionar item novo manualmente (não existe na lista)
+        function adicionarItemNovoManual(tipo) {
+            const container = document.getElementById(`itens-${tipo}`);
+            const vazio = document.getElementById(`${tipo}-vazio`);
+            vazio.style.display = 'none';
+
+            const contador = tipo === 'entrada' ? ++contadorLinhaEntrada : ++contadorLinhaSaida;
+            const id = `${tipo}-item-${contador}`;
+
+            const html = `
+                <div class="mov-item-row item-novo" id="${id}">
+                    <div class="alert alert-warning py-2 mb-2">
+                        <i class="bi bi-plus-circle"></i> <strong>Cadastro de Item Novo</strong> - Preencha todos os campos
+                    </div>
+                    <div class="row g-2 align-items-end mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Nome do Item <span class="text-danger">*</span></label>
+                            <input type="text" id="${id}-nome" class="form-control" placeholder="Digite o nome do NOVO item">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Grupo <span class="text-danger">*</span></label>
+                            <select id="${id}-grupo" class="form-select">
+                                <option value="">Selecione...</option>
+                                ${gruposCache.map(g => `<option value="${g}">${g}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Unidade <span class="text-danger">*</span></label>
+                            <select id="${id}-unidade" class="form-select">
+                                <option value="UN">UN - Unidade</option>
+                                <option value="KG">KG - Quilograma</option>
+                                <option value="MT">MT - Metro</option>
+                                <option value="PC">PC - Peça</option>
+                                <option value="CX">CX - Caixa</option>
+                                <option value="ROL">ROL - Rolo</option>
+                                <option value="PCT">PCT - Pacote</option>
+                                <option value="LT">LT - Litro</option>
+                                <option value="M2">M² - Metro²</option>
+                                <option value="PAR">PAR - Par</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label">Saldo Ini.</label>
+                            <input type="text" id="${id}-saldo" class="form-control text-end" value="0" readonly>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Quantidade <span class="text-danger">*</span></label>
+                            <input type="number" id="${id}-qtd" class="form-control" placeholder="0" min="0" step="0.01">
+                        </div>
+                        <div class="col-md-1 text-end">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-outline-danger w-100" onclick="removerLinhaItem('${id}', '${tipo}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Valor Unitário (R$) <span class="text-danger">*</span></label>
+                            <input type="number" id="${id}-valor" class="form-control" placeholder="Obrigatório" min="0" step="0.01">
+                        </div>
+                        <div class="col-md-9">
+                            <small class="text-muted" id="${id}-info">
+                                <i class="bi bi-info-circle"></i> Item novo - informe o valor unitário inicial
+                            </small>
+                        </div>
+                    </div>
+                    <input type="hidden" id="${id}-item-novo" value="true">
+                    <hr class="my-3">
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', html);
         }
 
         async function buscarGrupoItem(nomeInputId, grupoSelectId, statusId, rowId, itemNovoId) {
@@ -2173,38 +2354,82 @@
             const nf = document.getElementById(`${tipo}-nf`).value.trim();
             const obs = document.getElementById(`${tipo}-obs`).value.trim();
 
+            // Validar campos obrigatórios
+            if (!nf) {
+                alert('O campo NF/Pedido é obrigatório!');
+                document.getElementById(`${tipo}-nf`).focus();
+                document.getElementById(`${tipo}-nf`).classList.add('is-invalid');
+                return;
+            }
+            document.getElementById(`${tipo}-nf`).classList.remove('is-invalid');
+
+            if (!obs) {
+                alert('O campo Observação é obrigatório!');
+                document.getElementById(`${tipo}-obs`).focus();
+                document.getElementById(`${tipo}-obs`).classList.add('is-invalid');
+                return;
+            }
+            document.getElementById(`${tipo}-obs`).classList.remove('is-invalid');
+
+            // Verificar se é entrada com NF
+            const entradaComNF = tipo === 'entrada' && document.getElementById('entrada-com-nf')?.checked;
+
             const itens = [];
             let temErro = false;
 
             linhas.forEach(linha => {
+                if (temErro) return;
+
                 const id = linha.id;
                 const nome = document.getElementById(`${id}-nome`).value.trim();
                 const qtd = parseFloat(document.getElementById(`${id}-qtd`).value) || 0;
                 const grupo = document.getElementById(`${id}-grupo`).value;
+                const unidade = document.getElementById(`${id}-unidade`).value || 'UN';
+                const saldoAtual = parseFloat(document.getElementById(`${id}-saldo`).value?.replace(/\./g, '').replace(',', '.')) || 0;
+                const valorUnit = parseFloat(document.getElementById(`${id}-valor`).value) || 0;
                 const itemNovo = document.getElementById(`${id}-item-novo`).value === 'true';
 
                 if (!nome) {
                     alert('Preencha o nome do item');
+                    document.getElementById(`${id}-nome`).classList.add('is-invalid');
                     temErro = true;
                     return;
                 }
                 if (qtd <= 0) {
                     alert(`Quantidade inválida para o item: ${nome}`);
+                    document.getElementById(`${id}-qtd`).classList.add('is-invalid');
                     temErro = true;
                     return;
                 }
                 if (itemNovo && !grupo) {
                     alert(`Selecione o grupo para o item novo: ${nome}`);
+                    document.getElementById(`${id}-grupo`).classList.add('is-invalid');
                     temErro = true;
                     return;
                 }
+                // Validar valor unitário se entrada com NF
+                if (entradaComNF && valorUnit <= 0) {
+                    alert(`Informe o valor unitário para o item: ${nome}\n(Entrada com NF requer valor unitário)`);
+                    document.getElementById(`${id}-valor`).classList.add('is-invalid');
+                    document.getElementById(`${id}-valor`).focus();
+                    temErro = true;
+                    return;
+                }
+
+                // Calcular novo saldo
+                const novoSaldo = tipo === 'entrada' ? saldoAtual + qtd : saldoAtual - qtd;
 
                 itens.push({
                     item: nome,
                     quantidade: qtd,
                     nf: nf,
                     obs: obs,
-                    grupo: grupo
+                    grupo: grupo,
+                    unidade: unidade,
+                    saldo_atual: saldoAtual,
+                    novo_saldo: novoSaldo,
+                    valor_unitario: valorUnit,
+                    item_novo: itemNovo
                 });
             });
 
