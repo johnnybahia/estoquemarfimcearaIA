@@ -54,6 +54,11 @@ class GeradorListaCompras:
             self.df_historico['Data'], format='%d/%m/%Y', errors='coerce'
         )
 
+        # Mapear Unidade de cada item a partir do histórico (último registro)
+        if 'Unidade' in self.df_historico.columns:
+            unidades = self.df_historico.groupby('Item')['Unidade'].last()
+            self.df_estoque['Unidade'] = self.df_estoque['Item'].map(unidades).fillna('UN')
+
         # Calcular métricas
         self._calcular_metricas()
 
@@ -168,6 +173,7 @@ class GeradorListaCompras:
             item_compra = {
                 'item': row['Item'],
                 'grupo': row.get('Grupo', 'N/A'),
+                'unidade': row.get('Unidade', 'UN'),
                 'saldo_atual': row['Saldo'],
                 'media_diaria': row['Media_Diaria'],
                 'dias_cobertura': dias_cob,
@@ -227,7 +233,8 @@ RESUMO:
 TOP 15 ITENS PRIORITÁRIOS:
 """
         for i in self.lista_compras[:15]:
-            contexto += f"- {i['item']}: comprar {i['qtd_sugerida']:.0f} un ({i['urgencia']}) - cobertura atual: {i['dias_cobertura']:.0f} dias\n"
+            unidade = i.get('unidade', 'UN')
+            contexto += f"- {i['item']}: comprar {i['qtd_sugerida']:.0f} {unidade} ({i['urgencia']}) - cobertura atual: {i['dias_cobertura']:.0f} dias\n"
 
         prompt = f"""
 {contexto}
@@ -288,13 +295,14 @@ Seja objetivo e use português brasileiro.
         # Lista detalhada
         emojis = {'CRITICO': '🔴', 'URGENTE': '🟠', 'ALTO': '🟡', 'MEDIO': '🟢'}
 
-        print(f"\n{'Item':<40} {'Saldo':>8} {'Comprar':>10} {'Cobertura':>10} {'Prioridade':>10}")
-        print("-" * 80)
+        print(f"\n{'Item':<35} {'Un':>4} {'Saldo':>8} {'Comprar':>10} {'Cobertura':>12} {'Prioridade':>10}")
+        print("-" * 85)
 
         for item in self.lista_compras[:30]:
             emoji = emojis.get(item['urgencia'], '⚪')
+            unidade = item.get('unidade', 'UN')
             cob = f"{item['dias_cobertura']:.0f}d → {item['nova_cobertura']:.0f}d"
-            print(f"{item['item'][:39]:<40} {item['saldo_atual']:>8.0f} {item['qtd_sugerida']:>10.0f} {cob:>10} {emoji} {item['urgencia']:>8}")
+            print(f"{item['item'][:34]:<35} {unidade:>4} {item['saldo_atual']:>8.0f} {item['qtd_sugerida']:>10.0f} {cob:>12} {emoji} {item['urgencia']:>8}")
 
         if len(self.lista_compras) > 30:
             print(f"\n... e mais {len(self.lista_compras) - 30} itens")
@@ -313,6 +321,7 @@ Seja objetivo e use português brasileiro.
         colunas = {
             'item': 'Item',
             'grupo': 'Grupo',
+            'unidade': 'Unidade',
             'urgencia': 'Urgência',
             'saldo_atual': 'Saldo Atual',
             'qtd_sugerida': 'Qtd Sugerida',

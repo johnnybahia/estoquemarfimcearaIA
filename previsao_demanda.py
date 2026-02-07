@@ -64,11 +64,17 @@ class PrevisaoDemanda:
         # Ordenar por data
         df_item = df_item.sort_values('_data')
 
+        # Obter unidade de medida do último registro
+        unidade = df_item['Unidade'].iloc[-1] if 'Unidade' in df_item.columns else 'UN'
+        if not unidade or str(unidade).strip() == '':
+            unidade = 'UN'
+
         # Calcular métricas
         saidas = df_item[df_item['Saída'] > 0]['Saída']
 
         stats = {
             'item': item_nome,
+            'unidade': unidade,
             'saldo_atual': df_item['Saldo'].iloc[-1],
             'total_saidas': saidas.sum(),
             'qtd_movimentacoes': len(saidas),
@@ -217,21 +223,23 @@ class PrevisaoDemanda:
             return None
 
         # Construir contexto para IA
+        unidade = stats.get('unidade', 'UN')
         contexto = f"""
 ANÁLISE DE DEMANDA - {item_nome}
 
 ESTATÍSTICAS ATUAIS:
-- Saldo atual: {stats['saldo_atual']} unidades
-- Consumo últimos 30 dias: {stats['consumo_30d']:.0f} un
-- Consumo últimos 60 dias: {stats['consumo_60d']:.0f} un
-- Consumo últimos 90 dias: {stats['consumo_90d']:.0f} un
-- Média por saída: {stats['media_saida']:.1f} un
+- Unidade de medida: {unidade}
+- Saldo atual: {stats['saldo_atual']} {unidade}
+- Consumo últimos 30 dias: {stats['consumo_30d']:.0f} {unidade}
+- Consumo últimos 60 dias: {stats['consumo_60d']:.0f} {unidade}
+- Consumo últimos 90 dias: {stats['consumo_90d']:.0f} {unidade}
+- Média por saída: {stats['media_saida']:.1f} {unidade}
 - Frequência média: a cada {stats['frequencia_dias']:.0f} dias
 
 PREVISÕES:
 """
         for p in previsoes:
-            contexto += f"- {p['dias_previsao']} dias: {p['consumo_previsto']:.0f} un (saldo restante: {p['saldo_previsto']:.0f})\n"
+            contexto += f"- {p['dias_previsao']} dias: {p['consumo_previsto']:.0f} {unidade} (saldo restante: {p['saldo_previsto']:.0f} {unidade})\n"
 
         if sazonalidade and sazonalidade['meses_pico']:
             contexto += f"\nSAZONALIDADE:\n- Meses de pico: {', '.join(sazonalidade['meses_pico'])}\n"
@@ -317,13 +325,16 @@ def executar_previsao():
             item = input("Nome do item: ").strip().upper()
             previsoes = motor.prever_multiplos_periodos(item)
             if previsoes:
-                print(f"\n📈 PREVISÃO DE DEMANDA: {item}")
+                # Obter unidade do item
+                stats = motor.calcular_estatisticas_item(item)
+                unidade = stats.get('unidade', 'UN') if stats else 'UN'
+                print(f"\n📈 PREVISÃO DE DEMANDA: {item} (Unidade: {unidade})")
                 print("-" * 50)
                 for p in previsoes:
                     emoji = {"CRITICO": "🔴", "URGENTE": "🟠", "ATENCAO": "🟡", "NORMAL": "🟢"}.get(p['alerta'], "⚪")
                     print(f"\n{p['dias_previsao']} dias:")
-                    print(f"  Consumo previsto: {p['consumo_previsto']:.0f} un")
-                    print(f"  Saldo restante: {p['saldo_previsto']:.0f} un")
+                    print(f"  Consumo previsto: {p['consumo_previsto']:.0f} {unidade}")
+                    print(f"  Saldo restante: {p['saldo_previsto']:.0f} {unidade}")
                     print(f"  {emoji} {p['recomendacao']}")
             else:
                 print("❌ Item não encontrado")

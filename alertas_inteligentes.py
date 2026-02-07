@@ -53,6 +53,11 @@ class SistemaAlertas:
         data_30_dias = datetime.now() - timedelta(days=30)
         consumo_30d = df_hist[df_hist['Data'] >= data_30_dias].groupby('Item')['Saída'].sum()
 
+        # Mapear Unidade de cada item a partir do histórico (último registro)
+        if 'Unidade' in df_hist.columns:
+            unidades = df_hist.groupby('Item')['Unidade'].last()
+            self.df_estoque['Unidade'] = self.df_estoque['Item'].map(unidades).fillna('UN')
+
         self.df_estoque['Consumo_30d'] = self.df_estoque['Item'].map(consumo_30d).fillna(0)
         self.df_estoque['Media_Diaria'] = self.df_estoque['Consumo_30d'] / 30
         self.df_estoque['Dias_Cobertura'] = self.df_estoque.apply(
@@ -87,6 +92,7 @@ class SistemaAlertas:
             saldo = row.get('Saldo', 0)
             dias_cob = row.get('Dias_Cobertura', 999)
             consumo = row.get('Consumo_30d', 0)
+            unidade = row.get('Unidade', 'UN')
 
             nivel, motivo = self.classificar_nivel_alerta(dias_cob, saldo)
 
@@ -95,6 +101,7 @@ class SistemaAlertas:
                     'item': item,
                     'nivel': nivel,
                     'motivo': motivo,
+                    'unidade': unidade,
                     'saldo_atual': saldo,
                     'dias_cobertura': dias_cob,
                     'consumo_30d': consumo,
@@ -156,11 +163,13 @@ RESUMO:
 ITENS CRÍTICOS (ruptura iminente):
 """
         for a in agrupados['CRITICO'][:10]:
-            contexto += f"- {a['item']}: saldo {a['saldo_atual']:.0f}, cobertura {a['dias_cobertura']:.0f} dias\n"
+            unidade = a.get('unidade', 'UN')
+            contexto += f"- {a['item']}: saldo {a['saldo_atual']:.0f} {unidade}, cobertura {a['dias_cobertura']:.0f} dias\n"
 
         contexto += "\nITENS URGENTES:\n"
         for a in agrupados['URGENTE'][:10]:
-            contexto += f"- {a['item']}: saldo {a['saldo_atual']:.0f}, cobertura {a['dias_cobertura']:.0f} dias\n"
+            unidade = a.get('unidade', 'UN')
+            contexto += f"- {a['item']}: saldo {a['saldo_atual']:.0f} {unidade}, cobertura {a['dias_cobertura']:.0f} dias\n"
 
         prompt = f"""
 {contexto}
@@ -213,20 +222,22 @@ Seja direto, use português brasileiro e foque em ações concretas.
         # Críticos
         if agrupados['CRITICO']:
             print("\n🔴 ALERTAS CRÍTICOS - AÇÃO IMEDIATA")
-            print("-" * 70)
-            print(f"{'Item':<35} {'Saldo':>10} {'Cobertura':>12} {'Comprar':>10}")
-            print("-" * 70)
+            print("-" * 80)
+            print(f"{'Item':<30} {'Un':>4} {'Saldo':>10} {'Cobertura':>12} {'Comprar':>10}")
+            print("-" * 80)
             for a in agrupados['CRITICO'][:15]:
                 cob = f"{a['dias_cobertura']:.0f} dias" if a['dias_cobertura'] < 999 else "N/A"
-                print(f"{a['item'][:34]:<35} {a['saldo_atual']:>10.0f} {cob:>12} {a['qtd_sugerida']:>10.0f}")
+                unidade = a.get('unidade', 'UN')
+                print(f"{a['item'][:29]:<30} {unidade:>4} {a['saldo_atual']:>10.0f} {cob:>12} {a['qtd_sugerida']:>10.0f}")
 
         # Urgentes
         if agrupados['URGENTE']:
             print("\n🟠 ALERTAS URGENTES - PRÓXIMOS 7 DIAS")
-            print("-" * 70)
+            print("-" * 80)
             for a in agrupados['URGENTE'][:10]:
                 cob = f"{a['dias_cobertura']:.0f} dias"
-                print(f"  • {a['item'][:40]:<40} | {cob:>10} | Comprar: {a['qtd_sugerida']:.0f}")
+                unidade = a.get('unidade', 'UN')
+                print(f"  • {a['item'][:35]:<35} ({unidade}) | {cob:>10} | Comprar: {a['qtd_sugerida']:.0f} {unidade}")
 
         # Atenção
         if agrupados['ATENCAO']:

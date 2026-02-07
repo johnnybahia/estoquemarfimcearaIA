@@ -46,6 +46,11 @@ class ChatbotEstoque:
         dados_hist = sheet_hist.get_all_values()
         self.df_historico = pd.DataFrame(dados_hist[1:], columns=dados_hist[0])
 
+        # Mapear Unidade de cada item a partir do histórico (último registro)
+        if 'Unidade' in self.df_historico.columns:
+            unidades = self.df_historico.groupby('Item')['Unidade'].last()
+            self.df_estoque['Unidade'] = self.df_estoque['Item'].map(unidades).fillna('UN')
+
         for col in ['Entrada', 'Saída', 'Saldo']:
             if col in self.df_historico.columns:
                 self.df_historico[col] = self.df_historico[col].apply(converter_para_numero)
@@ -108,9 +113,10 @@ class ChatbotEstoque:
         if self.df_estoque is None:
             self.carregar_dados()
 
-        return self.df_estoque.nlargest(n, 'Consumo_30d')[
-            ['Item', 'Saldo', 'Consumo_30d', 'Dias_Cobertura']
-        ]
+        colunas = ['Item', 'Saldo', 'Consumo_30d', 'Dias_Cobertura']
+        if 'Unidade' in self.df_estoque.columns:
+            colunas.append('Unidade')
+        return self.df_estoque.nlargest(n, 'Consumo_30d')[colunas]
 
     def obter_itens_criticos(self, n=10):
         """Retorna itens mais críticos"""
@@ -122,7 +128,10 @@ class ChatbotEstoque:
             (self.df_estoque['Dias_Cobertura'] < 999)
         ].nsmallest(n, 'Dias_Cobertura')
 
-        return criticos[['Item', 'Saldo', 'Consumo_30d', 'Dias_Cobertura']]
+        colunas = ['Item', 'Saldo', 'Consumo_30d', 'Dias_Cobertura']
+        if 'Unidade' in self.df_estoque.columns:
+            colunas.append('Unidade')
+        return criticos[colunas]
 
     def construir_contexto_dados(self, pergunta):
         """Constrói contexto de dados relevante para a pergunta"""
@@ -155,10 +164,12 @@ DADOS DO ESTOQUE MARFIM - {datetime.now().strftime('%d/%m/%Y %H:%M')}
             contexto += "ITENS MENCIONADOS NA PERGUNTA:\n"
             for item_nome in set(itens_mencionados[:5]):
                 item_data = self.df_estoque[self.df_estoque['Item'] == item_nome].iloc[0]
+                unidade = item_data.get('Unidade', 'UN')
                 contexto += f"""
 {item_nome}:
-  - Saldo atual: {item_data['Saldo']:.0f}
-  - Consumo 30d: {item_data['Consumo_30d']:.0f}
+  - Saldo atual: {item_data['Saldo']:.0f} {unidade}
+  - Unidade de medida: {unidade}
+  - Consumo 30d: {item_data['Consumo_30d']:.0f} {unidade}
   - Cobertura: {item_data['Dias_Cobertura']:.0f} dias
 """
 
@@ -166,13 +177,15 @@ DADOS DO ESTOQUE MARFIM - {datetime.now().strftime('%d/%m/%Y %H:%M')}
         contexto += "\nTOP 5 MAIOR CONSUMO (30 dias):\n"
         top_consumo = self.obter_top_consumo(5)
         for _, row in top_consumo.iterrows():
-            contexto += f"- {row['Item']}: consumo {row['Consumo_30d']:.0f}, saldo {row['Saldo']:.0f}\n"
+            unidade = row.get('Unidade', 'UN')
+            contexto += f"- {row['Item']}: consumo {row['Consumo_30d']:.0f} {unidade}, saldo {row['Saldo']:.0f} {unidade}\n"
 
         # Críticos
         contexto += "\nITENS MAIS CRÍTICOS:\n"
         criticos = self.obter_itens_criticos(5)
         for _, row in criticos.iterrows():
-            contexto += f"- {row['Item']}: {row['Dias_Cobertura']:.0f} dias de cobertura, saldo {row['Saldo']:.0f}\n"
+            unidade = row.get('Unidade', 'UN')
+            contexto += f"- {row['Item']}: {row['Dias_Cobertura']:.0f} dias de cobertura, saldo {row['Saldo']:.0f} {unidade}\n"
 
         return contexto
 
@@ -203,6 +216,10 @@ Responda perguntas sobre estoque de forma direta, clara e em português brasilei
 Use os dados fornecidos para dar respostas precisas.
 Se não souber algo específico, diga que precisa verificar.
 Seja conciso mas completo.
+
+IMPORTANTE: Cada item tem sua própria unidade de medida (KG, UN, MT, PC, CX, ROL, PCT, etc).
+Sempre mencione a unidade correta ao informar quantidades.
+Exemplos de unidades: KG (quilograma), MT (metro), UN (unidade), PC (peça), CX (caixa), ROL (rolo), PCT (pacote).
 
 {contexto_dados}
 {historico}"""
