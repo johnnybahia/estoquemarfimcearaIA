@@ -14,11 +14,21 @@ def gerar_painel():
         client = gspread.authorize(creds)
         ss = client.open(NOME_PLANILHA)
         sheet_indice = ss.worksheet("ÍNDICE_ITENS")
+        sheet_estoque = ss.worksheet("ESTOQUE")
 
         # 1. LER O ÍNDICE (O mapa que recalibramos)
         print(f"📊 Gerando Relatório de Alertas para Marfim...")
         dados = sheet_indice.get_all_values()
         df = pd.DataFrame(dados[1:], columns=dados[0])
+
+        # Carregar histórico para obter unidades de medida
+        dados_estoque = sheet_estoque.get_all_values()
+        df_estoque = pd.DataFrame(dados_estoque[1:], columns=dados_estoque[0])
+
+        # Mapear Unidade de cada item a partir do histórico (último registro)
+        if 'Unidade' in df_estoque.columns:
+            unidades = df_estoque.groupby('Item')['Unidade'].last()
+            df['Unidade'] = df['Item'].map(unidades).fillna('UN')
 
         # Converter Saldo para número
         df['Saldo Atual'] = df['Saldo Atual'].str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
@@ -43,7 +53,8 @@ def gerar_painel():
         print("="*50)
         if not criticos.empty:
             for _, row in criticos.iterrows():
-                print(f"• {row['Item']} | Saldo: {row['Saldo Atual']} | Grupo: {row['Grupo']}")
+                unidade = row.get('Unidade', 'UN') if 'Unidade' in row else 'UN'
+                print(f"• {row['Item']} | Saldo: {row['Saldo Atual']} {unidade} | Grupo: {row['Grupo']}")
         else:
             print("✅ Nenhum item zerado ou negativo.")
 

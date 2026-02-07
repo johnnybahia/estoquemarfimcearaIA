@@ -71,17 +71,23 @@ def analisar_item_estrategico(nome_item):
         # Converte colunas numéricas
         for col in ['Entrada', 'Saída', 'Saldo']:
             historico_item[col] = historico_item[col].apply(converter_para_numero)
-        
+
         saldo_atual = historico_item['Saldo'].iloc[-1]
         saidas = historico_item[historico_item['Saída'] > 0]['Saída']
         media_saida = saidas.mean() if not saidas.empty else 0
         total_saidas = saidas.count()
 
+        # Obter unidade de medida do último registro
+        unidade = historico_item['Unidade'].iloc[-1] if 'Unidade' in historico_item.columns else 'UN'
+        if not unidade or unidade.strip() == '':
+            unidade = 'UN'
+
         print("\n" + "=" * 60)
         print(f"📊 RELATÓRIO TÉCNICO: {nome_item}")
         print("=" * 60)
-        print(f"✅ Saldo Atual: {saldo_atual}")
-        print(f"📉 Média por Saída: {media_saida:.2f}")
+        print(f"📏 Unidade de Medida: {unidade}")
+        print(f"✅ Saldo Atual: {saldo_atual} {unidade}")
+        print(f"📉 Média por Saída: {media_saida:.2f} {unidade}")
         print(f"📦 Movimentações de Saída: {total_saidas}")
 
         # 3. CONSTRUÇÃO DO PROMPT
@@ -90,17 +96,18 @@ def analisar_item_estrategico(nome_item):
         
         prompt = f"""
         Analise o estoque do item: {nome_item}
-        
+
         DADOS ATUAIS:
-        - Saldo em mãos: {saldo_atual}
-        - Média histórica de consumo: {media_saida:.2f} por saída.
-        
+        - Unidade de medida: {unidade}
+        - Saldo em mãos: {saldo_atual} {unidade}
+        - Média histórica de consumo: {media_saida:.2f} {unidade} por saída.
+
         HISTÓRICO RECENTE:
         {contexto_recente}
-        
+
         TAREFA:
-        Com base no saldo e na média de consumo, o estoque está em nível crítico? 
-        Recomende se devo comprar mais agora e em qual quantidade aproximada. 
+        Com base no saldo e na média de consumo, o estoque está em nível crítico?
+        Recomende se devo comprar mais agora e em qual quantidade aproximada (usando a unidade {unidade}).
         Seja direto e use português do Brasil.
         """
 

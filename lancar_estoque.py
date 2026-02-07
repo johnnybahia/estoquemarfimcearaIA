@@ -38,8 +38,15 @@ def realizar_lancamento():
         saldo_anterior = converter_para_numero(item_info[1])
         grupo = item_info[3]
         linha_antiga = int(item_info[4]) # Linha do último registro no ESTOQUE
-        
-        print(f"\n📦 Item: {item_nome} | Saldo Atual: {saldo_anterior}")
+
+        # Buscar a unidade de medida do último registro na aba ESTOQUE
+        try:
+            ultimo_registro = sheet_estoque.row_values(linha_antiga)
+            unidade = ultimo_registro[2] if len(ultimo_registro) > 2 and ultimo_registro[2].strip() else 'UN'
+        except:
+            unidade = 'UN'
+
+        print(f"\n📦 Item: {item_nome} | Saldo Atual: {saldo_anterior} {unidade} | Unidade: {unidade}")
 
         tipo = input("Tipo (E para Entrada / S para Saída): ").strip().upper()
         quantidade = converter_para_numero(input("Quantidade: "))
@@ -75,11 +82,11 @@ def realizar_lancamento():
         # 4. Gravação na aba ESTOQUE
         # Colunas: Grupo(A), Item(B), Unidade(C), Data(D), NF(E), Obs(F), S.Ant(G), Ent(H), Sai(I), Saldo(J), Val.Unit(K), AltEm(L), AltPor(M)
         nova_linha = [
-            grupo, item_nome, "", agora, nf, obs, 
-            str(saldo_anterior).replace('.', ','), 
-            str(entrada).replace('.', ','), 
-            str(saida).replace('.', ','), 
-            str(novo_saldo).replace('.', ','), 
+            grupo, item_nome, unidade, agora, nf, obs,
+            str(saldo_anterior).replace('.', ','),
+            str(entrada).replace('.', ','),
+            str(saida).replace('.', ','),
+            str(novo_saldo).replace('.', ','),
             str(preco_unitario).replace('.', ','), # Coluna K
             agora, usuario
         ]
@@ -106,11 +113,11 @@ def realizar_lancamento():
         ponto_critico = 10  # Exemplo: se baixar de 10 unidades
         if novo_saldo <= ponto_critico:
             print("\n🤖 IA: Detectado estoque baixo. Solicitando análise estratégica...")
-            
+
             # Pegamos apenas os últimos 10 movimentos para economizar tokens
-            historico_ia = sheet_estoque.get_all_values()[-10:] 
-            prompt = f"O item {item_nome} chegou ao saldo {novo_saldo}. Com base nestes últimos movimentos {historico_ia}, qual a urgência de compra de 1 a 10?"
-            
+            historico_ia = sheet_estoque.get_all_values()[-10:]
+            prompt = f"O item {item_nome} (unidade: {unidade}) chegou ao saldo {novo_saldo} {unidade}. Com base nestes últimos movimentos {historico_ia}, qual a urgência de compra de 1 a 10?"
+
             try:
                 # Chamada ao Gemini
                 response = model.generate_content(prompt)
@@ -118,10 +125,10 @@ def realizar_lancamento():
             except Exception as e:
                 print("⚠️ IA indisponível ou limite de cota atingido, mas o lançamento foi gravado!")
         else:
-            print(f"✅ Saldo {novo_saldo} está em nível seguro. IA em standby para economizar sua cota.")
+            print(f"✅ Saldo {novo_saldo} {unidade} está em nível seguro. IA em standby para economizar sua cota.")
 
         print(f"\n✅ LANÇAMENTO REALIZADO!")
-        print(f"Item: {item_nome} | Novo Saldo: {novo_saldo} | Preço Unit: {preco_unitario}")
+        print(f"Item: {item_nome} | Novo Saldo: {novo_saldo} {unidade} | Preço Unit: {preco_unitario}")
 
     except Exception as e:
         print(f"❌ Erro: {e}")
