@@ -2125,8 +2125,8 @@
 
             // Confirmação
             const tipoTexto = tipo === 'entrada' ? 'ENTRADA' : 'SAÍDA';
-            const confirmMsg = `Confirmar ${tipoTexto} de ${itens.length} item(s)?\\n\\n` +
-                itens.map(i => `- ${i.item}: ${i.quantidade}`).join('\\n');
+            const confirmMsg = `Confirmar ${tipoTexto} de ${itens.length} item(s)?\n\n` +
+                itens.map(i => `- ${i.item}: ${i.quantidade}`).join('\n');
 
             // Validar com IA primeiro
             const resultado = document.getElementById('resultado-movimentacao');
@@ -2185,7 +2185,6 @@
             }
 
             // Enviar para API
-            const resultado = document.getElementById('resultado-movimentacao');
             resultado.style.display = 'block';
             resultado.innerHTML = `
                 <div class="alert alert-info">
@@ -2354,9 +2353,9 @@
                 return;
             }
 
-            let csv = 'Item,Grupo,Saldo,Ultima Movimentacao,Dias Parado\\n';
+            let csv = 'Item,Grupo,Saldo,Ultima Movimentacao,Dias Parado\n';
             listaParadosData.forEach(item => {
-                csv += `"${item.nome}","${item.grupo || ''}",${item.saldo},"${item.ultima_mov}","${item.dias_parado}"\\n`;
+                csv += `"${item.nome}","${item.grupo || ''}",${item.saldo},"${item.ultima_mov}","${item.dias_parado}"\n`;
             });
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
