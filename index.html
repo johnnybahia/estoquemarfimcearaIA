@@ -1264,6 +1264,9 @@
             item.addEventListener('click', () => {
                 const page = item.dataset.page;
 
+                // Ignorar se não tem data-page (evita conflito com tabs do Bootstrap)
+                if (!page) return;
+
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                 item.classList.add('active');
 
