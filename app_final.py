@@ -760,6 +760,98 @@ def api_grupos():
         return jsonify({'success': False, 'error': str(e)})
 
 
+@app.route('/api/dados-auxiliares', methods=['GET'])
+def api_dados_auxiliares():
+    """Retorna grupos, unidades e observações da aba DADOS"""
+    try:
+        ss = conectar_google()
+        sheet_dados = ss.worksheet("DADOS")
+
+        # Carregar todas as colunas necessárias
+        # Coluna D = Grupos (índice 3)
+        # Coluna E = Unidades (índice 4)
+        # Coluna F = Observações (índice 5)
+        todos_dados = sheet_dados.get_all_values()
+
+        grupos = []
+        unidades = []
+        observacoes = []
+
+        for i, row in enumerate(todos_dados):
+            # Grupos - coluna D (índice 3), começando da linha 1
+            if len(row) > 3 and row[3].strip():
+                grupos.append(row[3].strip())
+
+            # Unidades - coluna E (índice 4), começando da linha 2
+            if i >= 1 and len(row) > 4 and row[4].strip():
+                unidades.append(row[4].strip())
+
+            # Observações - coluna F (índice 5), começando da linha 2
+            if i >= 1 and len(row) > 5 and row[5].strip():
+                observacoes.append(row[5].strip())
+
+        # Remover duplicatas e ordenar
+        grupos = sorted(list(set(grupos)))
+        unidades = sorted(list(set(unidades)))
+        observacoes = sorted(list(set(observacoes)))
+
+        return jsonify({
+            'success': True,
+            'grupos': grupos,
+            'unidades': unidades,
+            'observacoes': observacoes
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/adicionar-dado-auxiliar', methods=['POST'])
+def api_adicionar_dado_auxiliar():
+    """Adiciona novo grupo, unidade ou observação na aba DADOS"""
+    try:
+        dados = request.json
+        tipo = dados.get('tipo', '')  # 'grupo', 'unidade' ou 'observacao'
+        valor = dados.get('valor', '').strip()
+
+        if not tipo or not valor:
+            return jsonify({'success': False, 'error': 'Tipo e valor são obrigatórios'})
+
+        if tipo not in ['grupo', 'unidade', 'observacao']:
+            return jsonify({'success': False, 'error': 'Tipo inválido'})
+
+        ss = conectar_google()
+        sheet_dados = ss.worksheet("DADOS")
+
+        # Determinar coluna baseada no tipo
+        # D = Grupos, E = Unidades, F = Observações
+        colunas = {'grupo': 4, 'unidade': 5, 'observacao': 6}  # 1-indexed
+        coluna = colunas[tipo]
+
+        # Buscar valores existentes na coluna
+        valores_existentes = sheet_dados.col_values(coluna)
+
+        # Verificar se já existe (case insensitive)
+        if any(v.upper() == valor.upper() for v in valores_existentes if v.strip()):
+            return jsonify({
+                'success': False,
+                'error': f'{tipo.capitalize()} "{valor}" já existe na lista'
+            })
+
+        # Encontrar próxima linha vazia na coluna
+        proxima_linha = len(valores_existentes) + 1
+
+        # Adicionar o valor
+        sheet_dados.update_cell(proxima_linha, coluna, valor)
+
+        return jsonify({
+            'success': True,
+            'mensagem': f'{tipo.capitalize()} "{valor}" adicionado com sucesso',
+            'valor': valor
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 @app.route('/api/validar-movimentacao', methods=['POST'])
 def api_validar_movimentacao():
     """IA valida a movimentação antes de confirmar"""

@@ -936,16 +936,24 @@
                                     <label class="form-label">NF / Pedido <span class="text-danger">*</span></label>
                                     <input type="text" id="entrada-nf" class="form-control" placeholder="Obrigatório" required>
                                 </div>
-                                <div class="col-md-5">
-                                    <label class="form-label">Observação <span class="text-danger">*</span></label>
-                                    <input type="text" id="entrada-obs" class="form-control" placeholder="Obrigatório" required>
-                                </div>
                                 <div class="col-md-4">
+                                    <label class="form-label">Observação <span class="text-danger">*</span> <button class="btn btn-sm btn-link p-0" onclick="abrirModalDados('observacao')"><i class="bi bi-plus-circle"></i></button></label>
+                                    <div class="autocomplete-container">
+                                        <input type="text" id="entrada-obs" class="form-control" placeholder="Selecione ou digite..." required>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button class="btn btn-outline-secondary w-100" onclick="abrirModalDados()">
+                                        <i class="bi bi-gear"></i> Gerenciar
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
                                     <label class="form-label">&nbsp;</label>
                                     <div class="form-check mt-2">
                                         <input class="form-check-input" type="checkbox" id="entrada-com-nf" onchange="toggleEntradaNF()">
                                         <label class="form-check-label" for="entrada-com-nf">
-                                            <i class="bi bi-receipt"></i> Entrada com NF (obriga informar valor unitário)
+                                            <i class="bi bi-receipt"></i> Entrada com NF
                                         </label>
                                     </div>
                                 </div>
@@ -985,9 +993,17 @@
                                     <label class="form-label">NF / Pedido <span class="text-danger">*</span></label>
                                     <input type="text" id="saida-nf" class="form-control" placeholder="Obrigatório" required>
                                 </div>
-                                <div class="col-md-8">
-                                    <label class="form-label">Observação <span class="text-danger">*</span></label>
-                                    <input type="text" id="saida-obs" class="form-control" placeholder="Obrigatório" required>
+                                <div class="col-md-6">
+                                    <label class="form-label">Observação <span class="text-danger">*</span> <button class="btn btn-sm btn-link p-0" onclick="abrirModalDados('observacao')"><i class="bi bi-plus-circle"></i></button></label>
+                                    <div class="autocomplete-container">
+                                        <input type="text" id="saida-obs" class="form-control" placeholder="Selecione ou digite..." required>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button class="btn btn-outline-secondary w-100" onclick="abrirModalDados()">
+                                        <i class="bi bi-gear"></i> Gerenciar
+                                    </button>
                                 </div>
                             </div>
                             <hr>
@@ -1005,6 +1021,93 @@
 
             <!-- Resultado da movimentação -->
             <div id="resultado-movimentacao" style="display: none;"></div>
+        </div>
+
+        <!-- Modal Gerenciar Dados Auxiliares -->
+        <div class="modal fade" id="modalDadosAuxiliares" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-database-gear"></i> Gerenciar Dados do Sistema</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <ul class="nav nav-tabs" id="tabsDados">
+                            <li class="nav-item">
+                                <a class="nav-link active" data-bs-toggle="tab" href="#tab-grupos-dados">
+                                    <i class="bi bi-folder"></i> Grupos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#tab-unidades-dados">
+                                    <i class="bi bi-rulers"></i> Unidades
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#tab-obs-dados">
+                                    <i class="bi bi-chat-text"></i> Observações
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="tab-content pt-3">
+                            <!-- Tab Grupos -->
+                            <div class="tab-pane fade show active" id="tab-grupos-dados">
+                                <div class="row mb-3">
+                                    <div class="col-md-9">
+                                        <input type="text" id="novo-grupo" class="form-control" placeholder="Digite o nome do novo grupo...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button class="btn btn-success w-100" onclick="adicionarDadoAuxiliar('grupo')">
+                                            <i class="bi bi-plus"></i> Adicionar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                    <div id="lista-grupos-dados">Carregando...</div>
+                                </div>
+                            </div>
+                            <!-- Tab Unidades -->
+                            <div class="tab-pane fade" id="tab-unidades-dados">
+                                <div class="row mb-3">
+                                    <div class="col-md-9">
+                                        <input type="text" id="novo-unidade" class="form-control" placeholder="Digite a nova unidade (ex: KG, MT, UN)...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button class="btn btn-success w-100" onclick="adicionarDadoAuxiliar('unidade')">
+                                            <i class="bi bi-plus"></i> Adicionar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                    <div id="lista-unidades-dados">Carregando...</div>
+                                </div>
+                            </div>
+                            <!-- Tab Observações -->
+                            <div class="tab-pane fade" id="tab-obs-dados">
+                                <div class="row mb-3">
+                                    <div class="col-md-9">
+                                        <input type="text" id="novo-observacao" class="form-control" placeholder="Digite a nova observação padrão...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button class="btn btn-success w-100" onclick="adicionarDadoAuxiliar('observacao')">
+                                            <i class="bi bi-plus"></i> Adicionar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                    <div id="lista-obs-dados">Carregando...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <small class="text-muted me-auto">
+                            <i class="bi bi-info-circle"></i> Os dados são salvos automaticamente na aba DADOS da planilha
+                        </small>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Itens Parados -->
@@ -1861,6 +1964,8 @@
         // ============================================================
         let listaItensCache = [];
         let gruposCache = [];
+        let unidadesCache = [];
+        let observacoesCache = [];
 
         async function carregarCacheItens() {
             try {
@@ -1883,6 +1988,25 @@
                 }
             } catch (e) {
                 console.error('Erro ao carregar cache de grupos:', e);
+            }
+        }
+
+        async function carregarDadosAuxiliares() {
+            try {
+                const response = await fetch('/api/dados-auxiliares');
+                const data = await response.json();
+                if (data.success) {
+                    gruposCache = data.grupos;
+                    unidadesCache = data.unidades;
+                    observacoesCache = data.observacoes;
+                    console.log('Dados auxiliares carregados:', {
+                        grupos: gruposCache.length,
+                        unidades: unidadesCache.length,
+                        observacoes: observacoesCache.length
+                    });
+                }
+            } catch (e) {
+                console.error('Erro ao carregar dados auxiliares:', e);
             }
         }
 
@@ -2239,7 +2363,7 @@
             const html = `
                 <div class="mov-item-row item-novo" id="${id}">
                     <div class="alert alert-warning py-2 mb-2">
-                        <i class="bi bi-plus-circle"></i> <strong>Cadastro de Item Novo</strong> - Preencha todos os campos
+                        <i class="bi bi-plus-circle"></i> <strong>Cadastro de Item Novo</strong> - Preencha todos os campos (dados validados pela aba DADOS)
                     </div>
                     <div class="row g-2 align-items-end mb-2">
                         <div class="col-md-4">
@@ -2247,26 +2371,16 @@
                             <input type="text" id="${id}-nome" class="form-control" placeholder="Digite o nome do NOVO item">
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Grupo <span class="text-danger">*</span></label>
-                            <select id="${id}-grupo" class="form-select">
-                                <option value="">Selecione...</option>
-                                ${gruposCache.map(g => `<option value="${g}">${g}</option>`).join('')}
-                            </select>
+                            <label class="form-label">Grupo <span class="text-danger">*</span> <button class="btn btn-sm btn-link p-0" onclick="abrirModalDados('grupo')"><i class="bi bi-plus-circle"></i></button></label>
+                            <div class="autocomplete-container">
+                                <input type="text" id="${id}-grupo" class="form-control" placeholder="Selecione...">
+                            </div>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Unidade <span class="text-danger">*</span></label>
-                            <select id="${id}-unidade" class="form-select">
-                                <option value="UN">UN - Unidade</option>
-                                <option value="KG">KG - Quilograma</option>
-                                <option value="MT">MT - Metro</option>
-                                <option value="PC">PC - Peça</option>
-                                <option value="CX">CX - Caixa</option>
-                                <option value="ROL">ROL - Rolo</option>
-                                <option value="PCT">PCT - Pacote</option>
-                                <option value="LT">LT - Litro</option>
-                                <option value="M2">M² - Metro²</option>
-                                <option value="PAR">PAR - Par</option>
-                            </select>
+                            <label class="form-label">Unidade <span class="text-danger">*</span> <button class="btn btn-sm btn-link p-0" onclick="abrirModalDados('unidade')"><i class="bi bi-plus-circle"></i></button></label>
+                            <div class="autocomplete-container">
+                                <input type="text" id="${id}-unidade" class="form-control" placeholder="Selecione...">
+                            </div>
                         </div>
                         <div class="col-md-1">
                             <label class="form-label">Saldo Ini.</label>
@@ -2300,6 +2414,12 @@
             `;
 
             container.insertAdjacentHTML('beforeend', html);
+
+            // Configurar autocomplete para grupo e unidade
+            setTimeout(() => {
+                criarAutocompleteSimples(`${id}-grupo`, gruposCache, false);
+                criarAutocompleteSimples(`${id}-unidade`, unidadesCache, false);
+            }, 100);
         }
 
         async function buscarGrupoItem(nomeInputId, grupoSelectId, statusId, rowId, itemNovoId) {
@@ -3087,19 +3207,229 @@
             });
         }
 
+        // Autocomplete para campos de observação
+        function initObservacaoAutocomplete() {
+            criarAutocompleteSimples('entrada-obs', observacoesCache);
+            criarAutocompleteSimples('saida-obs', observacoesCache);
+        }
+
+        // Função genérica para criar autocomplete simples (grupos, unidades, observações)
+        function criarAutocompleteSimples(inputId, listaCache, allowNew = true) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            const container = input.parentElement;
+            container.classList.add('autocomplete-container');
+
+            let listId = inputId + '-autocomplete';
+            let list = document.getElementById(listId);
+            if (!list) {
+                list = document.createElement('div');
+                list.id = listId;
+                list.className = 'autocomplete-list';
+                container.appendChild(list);
+            }
+
+            let selectedIndex = -1;
+
+            input.addEventListener('input', function() {
+                const termo = this.value.trim().toUpperCase();
+                selectedIndex = -1;
+
+                // Usar a lista passada como parâmetro ou buscar do cache atual
+                const dados = typeof listaCache === 'function' ? listaCache() : listaCache;
+
+                if (termo.length < 1) {
+                    const resultados = dados.slice(0, 10);
+                    mostrarListaSimples(resultados, list, input, allowNew);
+                    return;
+                }
+
+                let resultados = dados.filter(item =>
+                    item.toUpperCase().startsWith(termo)
+                ).slice(0, 10);
+
+                const contem = dados.filter(item =>
+                    item.toUpperCase().includes(termo) &&
+                    !item.toUpperCase().startsWith(termo)
+                ).slice(0, 5);
+                resultados = [...resultados, ...contem];
+
+                mostrarListaSimples(resultados, list, input, allowNew);
+            });
+
+            input.addEventListener('focus', function() {
+                const dados = typeof listaCache === 'function' ? listaCache() : listaCache;
+                if (this.value.trim() === '' && dados.length > 0) {
+                    const resultados = dados.slice(0, 10);
+                    mostrarListaSimples(resultados, list, input, allowNew);
+                }
+            });
+
+            input.addEventListener('blur', function() {
+                setTimeout(() => {
+                    list.classList.remove('show');
+                }, 200);
+            });
+
+            input.addEventListener('keydown', function(e) {
+                const items = list.querySelectorAll('.autocomplete-item[data-valor]');
+                if (!list.classList.contains('show')) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (items.length > 0) {
+                        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                        list.querySelectorAll('.autocomplete-item').forEach((el, i) => el.classList.toggle('selected', i === selectedIndex));
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (items.length > 0) {
+                        selectedIndex = Math.max(selectedIndex - 1, 0);
+                        list.querySelectorAll('.autocomplete-item').forEach((el, i) => el.classList.toggle('selected', i === selectedIndex));
+                    }
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (selectedIndex >= 0 && items[selectedIndex]) {
+                        items[selectedIndex].click();
+                    } else if (items.length === 1) {
+                        items[0].click();
+                    }
+                } else if (e.key === 'Escape') {
+                    list.classList.remove('show');
+                }
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!container.contains(e.target)) {
+                    list.classList.remove('show');
+                }
+            });
+        }
+
+        function mostrarListaSimples(resultados, list, input, allowNew) {
+            if (resultados.length > 0) {
+                list.innerHTML = resultados.map((valor, idx) => `
+                    <div class="autocomplete-item" data-index="${idx}" data-valor="${valor}">
+                        <div class="item-nome">${valor}</div>
+                    </div>
+                `).join('');
+
+                list.querySelectorAll('.autocomplete-item').forEach(el => {
+                    el.addEventListener('click', function() {
+                        input.value = this.dataset.valor;
+                        input.classList.remove('is-invalid');
+                        input.classList.add('is-valid');
+                        list.classList.remove('show');
+                    });
+                });
+
+                list.classList.add('show');
+            } else if (allowNew) {
+                list.innerHTML = '<div class="autocomplete-item text-muted"><i class="bi bi-info-circle"></i> Digite livremente ou adicione novo</div>';
+                list.classList.add('show');
+            } else {
+                list.innerHTML = '<div class="autocomplete-item text-danger"><i class="bi bi-exclamation-triangle"></i> Não encontrado</div>';
+                list.classList.add('show');
+            }
+        }
+
+        // Abrir modal de gerenciamento de dados
+        function abrirModalDados(tipoInicial = null) {
+            // Carregar dados atualizados
+            atualizarListasDadosModal();
+
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById('modalDadosAuxiliares'));
+            modal.show();
+
+            // Selecionar aba se especificado
+            if (tipoInicial) {
+                const tabs = {
+                    'grupo': 'tab-grupos-dados',
+                    'unidade': 'tab-unidades-dados',
+                    'observacao': 'tab-obs-dados'
+                };
+                if (tabs[tipoInicial]) {
+                    setTimeout(() => {
+                        const tabEl = document.querySelector(`[href="#${tabs[tipoInicial]}"]`);
+                        if (tabEl) {
+                            new bootstrap.Tab(tabEl).show();
+                        }
+                    }, 100);
+                }
+            }
+        }
+
+        async function atualizarListasDadosModal() {
+            // Recarregar dados
+            await carregarDadosAuxiliares();
+
+            // Atualizar lista de grupos
+            document.getElementById('lista-grupos-dados').innerHTML = gruposCache.length > 0
+                ? gruposCache.map(g => `<span class="badge bg-primary me-1 mb-1">${g}</span>`).join('')
+                : '<span class="text-muted">Nenhum grupo cadastrado</span>';
+
+            // Atualizar lista de unidades
+            document.getElementById('lista-unidades-dados').innerHTML = unidadesCache.length > 0
+                ? unidadesCache.map(u => `<span class="badge bg-info me-1 mb-1">${u}</span>`).join('')
+                : '<span class="text-muted">Nenhuma unidade cadastrada</span>';
+
+            // Atualizar lista de observações
+            document.getElementById('lista-obs-dados').innerHTML = observacoesCache.length > 0
+                ? observacoesCache.map(o => `<span class="badge bg-secondary me-1 mb-1">${o}</span>`).join('')
+                : '<span class="text-muted">Nenhuma observação cadastrada</span>';
+        }
+
+        async function adicionarDadoAuxiliar(tipo) {
+            const inputId = `novo-${tipo}`;
+            const input = document.getElementById(inputId);
+            const valor = input.value.trim();
+
+            if (!valor) {
+                alert('Digite um valor para adicionar');
+                input.focus();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/adicionar-dado-auxiliar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tipo, valor })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(data.mensagem);
+                    input.value = '';
+                    // Recarregar listas
+                    await atualizarListasDadosModal();
+                    // Reinicializar autocompletes
+                    initObservacaoAutocomplete();
+                } else {
+                    alert('Erro: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Erro ao adicionar:', e);
+                alert('Erro ao adicionar: ' + e.message);
+            }
+        }
+
         // ============================================================
         // INIT
         // ============================================================
         document.addEventListener('DOMContentLoaded', () => {
             carregarDashboard();
             carregarCacheItens();
-            carregarCacheGrupos();
+            carregarDadosAuxiliares(); // Carrega grupos, unidades e observações da aba DADOS
 
             // Inicializar autocomplete após cache carregado
             setTimeout(() => {
                 initConferenciaAutocomplete();
                 initBuscaAutocomplete();
                 initGrupoComprasAutocomplete();
+                initObservacaoAutocomplete();
             }, 1000);
         });
 
