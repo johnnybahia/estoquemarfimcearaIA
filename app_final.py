@@ -998,6 +998,328 @@ def api_movimentacao():
         })
 
 
+# ============================================================
+# SISTEMA DE CONFERÊNCIA DE ESTOQUE
+# ============================================================
+
+@app.route('/api/lista-conferencia', methods=['GET'])
+def api_lista_conferencia():
+    """
+    Gera lista priorizada de itens para conferência.
+    Prioriza:
+    1. Itens com alta movimentação (mais chance de erro)
+    2. Itens não conferidos há muito tempo
+    3. Itens com saldo alto (mais valor em risco)
+    4. Itens com padrão de consumo irregular
+    """
+    try:
+        dias_sem_conferencia = int(request.args.get('dias', 30))
+        limite = int(request.args.get('limite', 50))
+
+        df_idx, df_hist = carregar_dados_completos()
+
+        # Encontrar coluna de última conferência (pode estar em Obs ou coluna específica)
+        col_obs = encontrar_coluna(df_idx, ['Obs', 'OBS', 'Observação', 'OBSERVAÇÃO', 'Ultima Conferencia', 'ULTIMA CONFERENCIA'])
+
+        hoje = datetime.now()
+
+        # Calcular métricas para priorização
+        df_conferencia = df_idx.copy()
+
+        # 1. Frequência de movimentação (quantas vezes movimentou nos últimos 30 dias)
+        if 'Data' in df_hist.columns and df_hist['Data'].notna().any():
+            data_30d = hoje - timedelta(days=30)
+            mov_30d = df_hist[df_hist['Data'] >= data_30d].groupby('Item_Norm').size()
+            df_conferencia['Movimentacoes_30d'] = df_conferencia['Item_Norm'].map(mov_30d).fillna(0)
+        else:
+            df_conferencia['Movimentacoes_30d'] = 0
+
+        # 2. Variabilidade do consumo (desvio padrão das saídas)
+        if 'Saída' in df_hist.columns:
+            variabilidade = df_hist.groupby('Item_Norm')['Saída'].std()
+            df_conferencia['Variabilidade'] = df_conferencia['Item_Norm'].map(variabilidade).fillna(0)
+        else:
+            df_conferencia['Variabilidade'] = 0
+
+        # 3. Tentar extrair última conferência do campo Obs (formato: "CONF:DD/MM/YYYY")
+        df_conferencia['Ultima_Conferencia'] = None
+        df_conferencia['Dias_Sem_Conferencia'] = 999
+
+        if col_obs and col_obs in df_conferencia.columns:
+            for idx, row in df_conferencia.iterrows():
+                obs = str(row[col_obs]) if pd.notna(row[col_obs]) else ''
+                # Procurar padrão CONF:DD/MM/YYYY ou similar
+                import re
+                match = re.search(r'CONF[:\s]*(\d{2}/\d{2}/\d{4})', obs.upper())
+                if match:
+                    try:
+                        data_conf = datetime.strptime(match.group(1), '%d/%m/%Y')
+                        df_conferencia.at[idx, 'Ultima_Conferencia'] = data_conf
+                        df_conferencia.at[idx, 'Dias_Sem_Conferencia'] = (hoje - data_conf).days
+                    except:
+                        pass
+
+        # 4. Calcular score de prioridade
+        # Quanto maior, mais urgente a conferência
+        df_conferencia['Score_Prioridade'] = (
+            df_conferencia['Movimentacoes_30d'] * 10 +  # Alta movimentação = prioridade
+            df_conferencia['Variabilidade'] * 5 +       # Alta variabilidade = prioridade
+            df_conferencia['Saldo'] / 100 +             # Saldo alto = prioridade
+            df_conferencia['Dias_Sem_Conferencia'] * 2  # Muito tempo sem conferir = prioridade
+        )
+
+        # Filtrar itens que precisam de conferência
+        df_conferencia = df_conferencia[
+            (df_conferencia['Dias_Sem_Conferencia'] >= dias_sem_conferencia) |
+            (df_conferencia['Movimentacoes_30d'] >= 10)  # Alta movimentação
+        ]
+
+        # Ordenar por prioridade
+        df_conferencia = df_conferencia.sort_values('Score_Prioridade', ascending=False)
+
+        # Encontrar coluna de grupo
+        col_grupo = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo', 'Categoria', 'CATEGORIA'])
+
+        # Preparar lista
+        itens = []
+        for _, row in df_conferencia.head(limite).iterrows():
+            ultima_conf = row['Ultima_Conferencia']
+            itens.append({
+                'nome': row['Item'],
+                'grupo': row[col_grupo] if col_grupo and col_grupo in row else '',
+                'saldo_sistema': float(row['Saldo']),
+                'movimentacoes_30d': int(row['Movimentacoes_30d']),
+                'consumo_30d': float(row['Consumo_30d']),
+                'variabilidade': float(row['Variabilidade']),
+                'ultima_conferencia': ultima_conf.strftime('%d/%m/%Y') if pd.notna(ultima_conf) else 'Nunca',
+                'dias_sem_conferencia': int(row['Dias_Sem_Conferencia']) if row['Dias_Sem_Conferencia'] != 999 else 'Nunca',
+                'prioridade': 'ALTA' if row['Score_Prioridade'] > 100 else ('MÉDIA' if row['Score_Prioridade'] > 50 else 'NORMAL'),
+                'score': float(row['Score_Prioridade'])
+            })
+
+        # Estatísticas
+        stats = {
+            'total_itens': len(df_idx),
+            'itens_conferir': len(df_conferencia),
+            'alta_prioridade': len([i for i in itens if i['prioridade'] == 'ALTA']),
+            'media_prioridade': len([i for i in itens if i['prioridade'] == 'MÉDIA']),
+            'nunca_conferidos': len([i for i in itens if i['ultima_conferencia'] == 'Nunca'])
+        }
+
+        return jsonify({
+            'success': True,
+            'itens': itens,
+            'estatisticas': stats,
+            'filtro_dias': dias_sem_conferencia
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()})
+
+
+@app.route('/api/registrar-conferencia', methods=['POST'])
+def api_registrar_conferencia():
+    """Registra conferência de um item"""
+    try:
+        dados = request.json
+        item_nome = dados.get('item', '').strip()
+        saldo_fisico = float(dados.get('saldo_fisico', 0))
+        obs = dados.get('obs', '')
+
+        if not item_nome:
+            return jsonify({'success': False, 'error': 'Nome do item não informado'})
+
+        ss = conectar_google()
+        df_idx, df_hist = carregar_dados_completos()
+
+        # Buscar item
+        item_data = df_idx[df_idx['Item'].str.upper() == item_nome.upper()]
+        if item_data.empty:
+            return jsonify({'success': False, 'error': 'Item não encontrado'})
+
+        saldo_sistema = float(item_data.iloc[0]['Saldo'])
+        divergencia = saldo_fisico - saldo_sistema
+
+        # Registrar movimentação de ajuste se houver divergência
+        resultado = {
+            'item': item_nome,
+            'saldo_sistema': saldo_sistema,
+            'saldo_fisico': saldo_fisico,
+            'divergencia': divergencia,
+            'ajuste_registrado': False
+        }
+
+        if abs(divergencia) > 0.01:  # Se há divergência significativa
+            sheet_hist = ss.worksheet("ESTOQUE")
+            colunas_hist = sheet_hist.row_values(1)
+
+            # Encontrar grupo do item
+            col_grupo = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo'])
+            grupo = item_data.iloc[0][col_grupo] if col_grupo and col_grupo in item_data.iloc[0] else ''
+
+            data_atual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+
+            # Preparar linha de ajuste
+            nova_linha = [''] * len(colunas_hist)
+            tipo_ajuste = 'entrada' if divergencia > 0 else 'saida'
+
+            for i, col in enumerate(colunas_hist):
+                col_upper = col.upper()
+                if 'GRUPO' in col_upper:
+                    nova_linha[i] = grupo
+                elif 'ITEM' in col_upper:
+                    nova_linha[i] = item_nome
+                elif 'DATA' in col_upper:
+                    nova_linha[i] = data_atual
+                elif 'OBS' in col_upper:
+                    nova_linha[i] = f"CONFERÊNCIA: {obs}. Ajuste de {divergencia:+.2f}. CONF:{datetime.now().strftime('%d/%m/%Y')}"
+                elif 'ENTRADA' in col_upper:
+                    nova_linha[i] = str(abs(divergencia)).replace('.', ',') if divergencia > 0 else ''
+                elif 'SAÍDA' in col_upper or 'SAIDA' in col_upper:
+                    nova_linha[i] = str(abs(divergencia)).replace('.', ',') if divergencia < 0 else ''
+
+            sheet_hist.append_row(nova_linha)
+            resultado['ajuste_registrado'] = True
+            resultado['tipo_ajuste'] = tipo_ajuste
+
+        return jsonify({
+            'success': True,
+            'resultado': resultado
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()})
+
+
+@app.route('/api/analisar-divergencias', methods=['POST'])
+def api_analisar_divergencias():
+    """IA analisa padrões de divergência e sugere ações"""
+    try:
+        conferencias = request.json.get('conferencias', [])
+
+        if not client_groq:
+            return jsonify({'success': False, 'error': 'IA não configurada'})
+
+        if not conferencias:
+            return jsonify({'success': False, 'error': 'Nenhuma conferência para analisar'})
+
+        # Limitar análise
+        conferencias = conferencias[:15]
+
+        # Calcular estatísticas
+        total_divergencias = sum(1 for c in conferencias if c.get('divergencia', 0) != 0)
+        soma_positiva = sum(c['divergencia'] for c in conferencias if c.get('divergencia', 0) > 0)
+        soma_negativa = sum(c['divergencia'] for c in conferencias if c.get('divergencia', 0) < 0)
+
+        prompt = f"""
+Analise estas conferências de estoque de uma indústria têxtil (produtos em KG, consumo por metro):
+
+CONFERÊNCIAS REALIZADAS:
+{chr(10).join([f"- {c['item']}: Sistema {c['saldo_sistema']:.1f}kg, Físico {c['saldo_fisico']:.1f}kg, Divergência {c['divergencia']:+.1f}kg" for c in conferencias])}
+
+ESTATÍSTICAS:
+- Total com divergência: {total_divergencias} de {len(conferencias)}
+- Soma divergências positivas (sobras): {soma_positiva:+.1f}kg
+- Soma divergências negativas (faltas): {soma_negativa:.1f}kg
+
+CONTEXTO: Produtos têxteis em KG, saídas calculadas por peso/metro × metros do pedido.
+
+Responda:
+1. PADRÃO DETECTADO: Qual o principal problema? (erro de cálculo, perdas, furto, erros de pesagem?)
+2. ITENS CRÍTICOS: Quais itens merecem atenção especial?
+3. CAUSA PROVÁVEL: Por que está acontecendo?
+4. AÇÕES RECOMENDADAS: O que fazer para resolver? (bullet points práticos)
+5. FREQUÊNCIA SUGERIDA: Com que frequência conferir estes itens?
+
+Seja direto e prático. Use português brasileiro.
+"""
+
+        resposta = consultar_ia(prompt, "Você é um especialista em gestão de estoque têxtil.")
+
+        return jsonify({
+            'success': True,
+            'analise': resposta,
+            'estatisticas': {
+                'total_conferencias': len(conferencias),
+                'com_divergencia': total_divergencias,
+                'sobras_kg': round(soma_positiva, 2),
+                'faltas_kg': round(abs(soma_negativa), 2)
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/sugerir-conferencia-ia', methods=['GET'])
+def api_sugerir_conferencia_ia():
+    """IA sugere quais itens conferir com base nos padrões"""
+    try:
+        if not client_groq:
+            return jsonify({'success': False, 'error': 'IA não configurada'})
+
+        df_idx, df_hist = carregar_dados_completos()
+
+        # Coletar dados para análise
+        hoje = datetime.now()
+        data_30d = hoje - timedelta(days=30)
+
+        # Top 20 por movimentação
+        if 'Data' in df_hist.columns and df_hist['Data'].notna().any():
+            mov_30d = df_hist[df_hist['Data'] >= data_30d].groupby('Item_Norm').agg({
+                'Saída': ['sum', 'count', 'std']
+            }).reset_index()
+            mov_30d.columns = ['Item_Norm', 'Saida_Total', 'Qtd_Movimentos', 'Variabilidade']
+            mov_30d = mov_30d.sort_values('Qtd_Movimentos', ascending=False).head(20)
+
+            # Juntar com dados do índice
+            df_analise = df_idx.merge(mov_30d, on='Item_Norm', how='inner')
+        else:
+            df_analise = df_idx.nlargest(20, 'Consumo_30d')
+            df_analise['Qtd_Movimentos'] = 0
+            df_analise['Variabilidade'] = 0
+
+        # Preparar contexto para IA
+        itens_contexto = []
+        for _, row in df_analise.iterrows():
+            itens_contexto.append({
+                'nome': row['Item'],
+                'saldo': float(row['Saldo']),
+                'consumo_30d': float(row['Consumo_30d']),
+                'movimentos': int(row.get('Qtd_Movimentos', 0)),
+                'variabilidade': float(row.get('Variabilidade', 0))
+            })
+
+        prompt = f"""
+Você é o supervisor de estoque da Marfim Têxtil. Analise estes {len(itens_contexto)} itens com maior movimentação:
+
+{chr(10).join([f"- {i['nome']}: Saldo {i['saldo']:.0f}kg, Consumo 30d {i['consumo_30d']:.0f}kg, {i['movimentos']} movimentos, variabilidade {i['variabilidade']:.1f}" for i in itens_contexto])}
+
+CONTEXTO: Indústria têxtil, produtos em KG, consumo calculado por metro.
+
+Selecione os 10 itens que MAIS PRECISAM de conferência HOJE e explique por quê.
+Considere:
+- Alta movimentação = mais chance de erro
+- Alta variabilidade = padrão irregular, possível problema
+- Saldo alto = maior risco financeiro
+
+Responda com a lista dos 10 itens prioritários e uma justificativa CURTA para cada.
+"""
+
+        resposta = consultar_ia(prompt, "Você é um supervisor de estoque experiente. Seja direto.")
+
+        return jsonify({
+            'success': True,
+            'sugestao_ia': resposta,
+            'itens_analisados': len(itens_contexto)
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 @app.route('/api/debug', methods=['GET'])
 def api_debug():
     """Endpoint de diagnóstico - mostra informações sobre os dados carregados"""

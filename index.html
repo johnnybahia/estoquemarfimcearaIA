@@ -437,6 +437,9 @@
             <div class="nav-item" data-page="parados">
                 <i class="bi bi-clock-history"></i> Itens Parados
             </div>
+            <div class="nav-item" data-page="conferencia">
+                <i class="bi bi-clipboard-check"></i> Conferência
+            </div>
             <div class="nav-item" data-page="relatorios">
                 <i class="bi bi-bar-chart"></i> Relatórios
             </div>
@@ -1060,6 +1063,173 @@
             <div class="loading" id="loading-parados">
                 <div class="spinner"></div>
                 <p>Buscando itens parados...</p>
+            </div>
+        </div>
+
+        <!-- Conferência de Estoque -->
+        <div id="page-conferencia" class="page-section">
+            <div class="page-header">
+                <h2><i class="bi bi-clipboard-check"></i> Conferência de Estoque</h2>
+                <button class="btn btn-primary-custom" onclick="sugerirConferenciaIA()">
+                    <i class="bi bi-robot"></i> IA Sugerir Prioridades
+                </button>
+            </div>
+
+            <!-- Sugestão IA -->
+            <div id="sugestao-conferencia-ia" class="mb-4" style="display: none;"></div>
+
+            <!-- Filtros -->
+            <div class="card card-custom mb-4">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Sem conferência há mais de:</label>
+                            <div class="input-group">
+                                <input type="number" id="input-dias-conferencia" class="form-control" value="30" min="1">
+                                <span class="input-group-text">dias</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Limite de itens:</label>
+                            <input type="number" id="input-limite-conferencia" class="form-control" value="50" min="10" max="200">
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary-custom w-100" onclick="carregarListaConferencia()">
+                                <i class="bi bi-list-check"></i> Gerar Lista
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-success w-100" onclick="exportarConferencia()">
+                                <i class="bi bi-printer"></i> Imprimir Lista
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estatísticas -->
+            <div class="row g-3 mb-4" id="resumo-conferencia" style="display: none;">
+                <div class="col-md-3">
+                    <div class="kpi-card">
+                        <div class="value text-danger" id="conf-alta">0</div>
+                        <div class="label">Alta Prioridade</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card">
+                        <div class="value text-warning" id="conf-media">0</div>
+                        <div class="label">Média Prioridade</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card">
+                        <div class="value" id="conf-nunca">0</div>
+                        <div class="label">Nunca Conferidos</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card">
+                        <div class="value" id="conf-total">0</div>
+                        <div class="label">Total na Lista</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulário de Conferência Rápida -->
+            <div class="card card-custom mb-4">
+                <div class="card-header">
+                    <i class="bi bi-pencil-square"></i> Registrar Conferência
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Item</label>
+                            <div class="autocomplete-container">
+                                <input type="text" id="conf-item-nome" class="form-control" placeholder="Digite o nome do item...">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Saldo Sistema</label>
+                            <input type="text" id="conf-saldo-sistema" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Saldo Físico (kg)</label>
+                            <input type="number" id="conf-saldo-fisico" class="form-control" placeholder="0.00" step="0.01">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Observação</label>
+                            <input type="text" id="conf-obs" class="form-control" placeholder="Opcional">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-success w-100" onclick="registrarConferencia()">
+                                <i class="bi bi-check-lg"></i> Registrar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="conf-resultado" class="mt-3" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Lista de Conferência -->
+            <div class="card card-custom">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-list"></i> Lista de Conferência do Almoxarife</span>
+                    <button class="btn btn-sm btn-primary-custom" onclick="analisarDivergenciasIA()">
+                        <i class="bi bi-robot"></i> Analisar Divergências
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-custom" id="table-conferencia">
+                            <thead>
+                                <tr>
+                                    <th>Prioridade</th>
+                                    <th>Item</th>
+                                    <th>Grupo</th>
+                                    <th>Saldo Sistema</th>
+                                    <th>Mov. 30d</th>
+                                    <th>Última Conf.</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        Clique em "Gerar Lista" para ver os itens que precisam de conferência
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Histórico de Conferências -->
+            <div class="card card-custom mt-4" id="historico-conferencias" style="display: none;">
+                <div class="card-header">
+                    <i class="bi bi-clock-history"></i> Conferências Realizadas Hoje
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-custom" id="table-historico-conf">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Saldo Sistema</th>
+                                    <th>Saldo Físico</th>
+                                    <th>Divergência</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading-conferencia">
+                <div class="spinner"></div>
+                <p>Carregando lista de conferência...</p>
             </div>
         </div>
 
@@ -2256,12 +2426,366 @@
         }
 
         // ============================================================
+        // CONFERÊNCIA DE ESTOQUE
+        // ============================================================
+        let listaConferenciaData = [];
+        let historicoConferencias = [];
+
+        async function carregarListaConferencia() {
+            const dias = parseInt(document.getElementById('input-dias-conferencia').value) || 30;
+            const limite = parseInt(document.getElementById('input-limite-conferencia').value) || 50;
+
+            document.getElementById('loading-conferencia').classList.add('show');
+
+            try {
+                const response = await fetch(`/api/lista-conferencia?dias=${dias}&limite=${limite}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    listaConferenciaData = data.itens;
+
+                    // Atualizar estatísticas
+                    document.getElementById('resumo-conferencia').style.display = 'flex';
+                    document.getElementById('conf-alta').textContent = data.estatisticas.alta_prioridade;
+                    document.getElementById('conf-media').textContent = data.estatisticas.media_prioridade;
+                    document.getElementById('conf-nunca').textContent = data.estatisticas.nunca_conferidos;
+                    document.getElementById('conf-total').textContent = data.itens.length;
+
+                    // Preencher tabela
+                    const tbody = document.querySelector('#table-conferencia tbody');
+                    if (data.itens.length > 0) {
+                        tbody.innerHTML = data.itens.map((item, idx) => {
+                            const badgeClass = item.prioridade === 'ALTA' ? 'bg-danger' :
+                                              (item.prioridade === 'MÉDIA' ? 'bg-warning' : 'bg-secondary');
+                            return `
+                                <tr>
+                                    <td><span class="badge ${badgeClass}">${item.prioridade}</span></td>
+                                    <td><strong>${item.nome}</strong></td>
+                                    <td>${item.grupo || '-'}</td>
+                                    <td>${item.saldo_sistema.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</td>
+                                    <td>${item.movimentacoes_30d}</td>
+                                    <td>${item.ultima_conferencia}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="selecionarParaConferencia('${item.nome.replace(/'/g, "\\'")}', ${item.saldo_sistema})">
+                                            <i class="bi bi-pencil"></i> Conferir
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('');
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-success py-4"><i class="bi bi-check-circle"></i> Nenhum item precisa de conferência!</td></tr>';
+                    }
+                } else {
+                    alert('Erro: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Erro:', e);
+                alert('Erro ao carregar lista de conferência');
+            }
+
+            document.getElementById('loading-conferencia').classList.remove('show');
+        }
+
+        function selecionarParaConferencia(nome, saldoSistema) {
+            document.getElementById('conf-item-nome').value = nome;
+            document.getElementById('conf-saldo-sistema').value = saldoSistema.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + ' kg';
+            document.getElementById('conf-saldo-fisico').value = '';
+            document.getElementById('conf-saldo-fisico').focus();
+        }
+
+        async function registrarConferencia() {
+            const nome = document.getElementById('conf-item-nome').value.trim();
+            const saldoFisico = parseFloat(document.getElementById('conf-saldo-fisico').value) || 0;
+            const obs = document.getElementById('conf-obs').value.trim();
+
+            if (!nome) {
+                alert('Selecione um item');
+                return;
+            }
+            if (saldoFisico < 0) {
+                alert('Saldo físico inválido');
+                return;
+            }
+
+            const resultado = document.getElementById('conf-resultado');
+            resultado.style.display = 'block';
+            resultado.innerHTML = '<div class="alert alert-info"><div class="spinner-border spinner-border-sm me-2"></div> Registrando conferência...</div>';
+
+            try {
+                const response = await fetch('/api/registrar-conferencia', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ item: nome, saldo_fisico: saldoFisico, obs: obs })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    const r = data.resultado;
+                    const divergencia = r.divergencia;
+                    const statusClass = Math.abs(divergencia) < 0.01 ? 'success' :
+                                        (Math.abs(divergencia) < 5 ? 'warning' : 'danger');
+
+                    resultado.innerHTML = `
+                        <div class="alert alert-${statusClass}">
+                            <strong>${r.item}</strong><br>
+                            Sistema: ${r.saldo_sistema.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg |
+                            Físico: ${r.saldo_fisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg |
+                            <strong>Divergência: ${divergencia > 0 ? '+' : ''}${divergencia.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</strong>
+                            ${r.ajuste_registrado ? ' | <span class="badge bg-info">Ajuste registrado</span>' : ''}
+                        </div>
+                    `;
+
+                    // Adicionar ao histórico
+                    historicoConferencias.push({
+                        item: r.item,
+                        saldo_sistema: r.saldo_sistema,
+                        saldo_fisico: r.saldo_fisico,
+                        divergencia: divergencia
+                    });
+                    atualizarHistoricoConferencias();
+
+                    // Limpar campos
+                    document.getElementById('conf-item-nome').value = '';
+                    document.getElementById('conf-saldo-sistema').value = '';
+                    document.getElementById('conf-saldo-fisico').value = '';
+                    document.getElementById('conf-obs').value = '';
+                } else {
+                    resultado.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro: ${data.error}</div>`;
+                }
+            } catch (e) {
+                resultado.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro de conexão: ${e.message}</div>`;
+            }
+        }
+
+        function atualizarHistoricoConferencias() {
+            if (historicoConferencias.length === 0) return;
+
+            document.getElementById('historico-conferencias').style.display = 'block';
+            const tbody = document.querySelector('#table-historico-conf tbody');
+
+            tbody.innerHTML = historicoConferencias.map(c => {
+                const statusClass = Math.abs(c.divergencia) < 0.01 ? 'success' :
+                                    (Math.abs(c.divergencia) < 5 ? 'warning' : 'danger');
+                return `
+                    <tr>
+                        <td>${c.item}</td>
+                        <td>${c.saldo_sistema.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</td>
+                        <td>${c.saldo_fisico.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</td>
+                        <td class="text-${statusClass}"><strong>${c.divergencia > 0 ? '+' : ''}${c.divergencia.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</strong></td>
+                        <td><span class="badge bg-${statusClass}">${Math.abs(c.divergencia) < 0.01 ? 'OK' : 'Ajustado'}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function analisarDivergenciasIA() {
+            if (historicoConferencias.length === 0) {
+                alert('Registre algumas conferências primeiro para analisar');
+                return;
+            }
+
+            const container = document.getElementById('sugestao-conferencia-ia');
+            container.style.display = 'block';
+            container.innerHTML = `
+                <div class="card card-custom">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-robot"></i> Analisando Divergências...
+                    </div>
+                    <div class="card-body text-center py-4">
+                        <div class="spinner"></div>
+                        <p>IA analisando ${historicoConferencias.length} conferências...</p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/analisar-divergencias', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conferencias: historicoConferencias })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    container.innerHTML = `
+                        <div class="card card-custom">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-robot"></i> Análise de Divergências</span>
+                                <button class="btn btn-sm btn-outline-light" onclick="document.getElementById('sugestao-conferencia-ia').style.display='none'">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-3 text-center">
+                                        <div class="fs-4 fw-bold">${data.estatisticas.total_conferencias}</div>
+                                        <small class="text-muted">Conferências</small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <div class="fs-4 fw-bold text-warning">${data.estatisticas.com_divergencia}</div>
+                                        <small class="text-muted">Com Divergência</small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <div class="fs-4 fw-bold text-success">+${data.estatisticas.sobras_kg} kg</div>
+                                        <small class="text-muted">Sobras</small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <div class="fs-4 fw-bold text-danger">-${data.estatisticas.faltas_kg} kg</div>
+                                        <small class="text-muted">Faltas</small>
+                                    </div>
+                                </div>
+                                <hr>
+                                <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">${data.analise}</pre>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro: ${data.error}</div>`;
+                }
+            } catch (e) {
+                container.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro: ${e.message}</div>`;
+            }
+        }
+
+        async function sugerirConferenciaIA() {
+            const container = document.getElementById('sugestao-conferencia-ia');
+            container.style.display = 'block';
+            container.innerHTML = `
+                <div class="card card-custom">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-robot"></i> IA Analisando Prioridades...
+                    </div>
+                    <div class="card-body text-center py-4">
+                        <div class="spinner"></div>
+                        <p>Analisando padrões de movimentação...</p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/sugerir-conferencia-ia');
+                const data = await response.json();
+
+                if (data.success) {
+                    container.innerHTML = `
+                        <div class="card card-custom">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-robot"></i> Sugestão da IA - O Que Conferir Hoje</span>
+                                <button class="btn btn-sm btn-outline-light" onclick="document.getElementById('sugestao-conferencia-ia').style.display='none'">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">${data.sugestao_ia}</pre>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro: ${data.error}</div>`;
+                }
+            } catch (e) {
+                container.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Erro: ${e.message}</div>`;
+            }
+        }
+
+        function exportarConferencia() {
+            if (!listaConferenciaData.length) {
+                alert('Gere a lista primeiro!');
+                return;
+            }
+
+            // Criar versão para impressão
+            let html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Lista de Conferência - ${new Date().toLocaleDateString('pt-BR')}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        h1 { text-align: center; margin-bottom: 5px; }
+                        h3 { text-align: center; color: #666; margin-top: 0; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #333; padding: 8px; text-align: left; }
+                        th { background: #f0f0f0; }
+                        .prioridade-alta { background: #fee2e2; }
+                        .prioridade-media { background: #fef3c7; }
+                        .campo-vazio { width: 80px; }
+                        .divergencia { width: 80px; }
+                        @media print { body { margin: 0; } }
+                    </style>
+                </head>
+                <body>
+                    <h1>MARFIM TÊXTIL - Lista de Conferência</h1>
+                    <h3>Data: ${new Date().toLocaleDateString('pt-BR')} | Total: ${listaConferenciaData.length} itens</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Prioridade</th>
+                                <th>Item</th>
+                                <th>Grupo</th>
+                                <th>Saldo Sistema (kg)</th>
+                                <th class="campo-vazio">Saldo Físico</th>
+                                <th class="divergencia">Divergência</th>
+                                <th>Visto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            listaConferenciaData.forEach(item => {
+                const prioridadeClass = item.prioridade === 'ALTA' ? 'prioridade-alta' :
+                                       (item.prioridade === 'MÉDIA' ? 'prioridade-media' : '');
+                html += `
+                    <tr class="${prioridadeClass}">
+                        <td>${item.prioridade}</td>
+                        <td><strong>${item.nome}</strong></td>
+                        <td>${item.grupo || '-'}</td>
+                        <td>${item.saldo_sistema.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td class="campo-vazio"></td>
+                        <td class="divergencia"></td>
+                        <td></td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                    <p style="margin-top: 30px;">
+                        <strong>Conferido por:</strong> _________________________
+                        <strong>Data:</strong> _____/_____/_____
+                    </p>
+                </body>
+                </html>
+            `;
+
+            // Abrir em nova janela para impressão
+            const win = window.open('', '_blank');
+            win.document.write(html);
+            win.document.close();
+            win.print();
+        }
+
+        // Configurar autocomplete para campo de conferência
+        function initConferenciaAutocomplete() {
+            criarAutocomplete('conf-item-nome', (item) => {
+                document.getElementById('conf-saldo-sistema').value =
+                    item.saldo.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + ' kg';
+                document.getElementById('conf-saldo-fisico').focus();
+            });
+        }
+
+        // ============================================================
         // INIT
         // ============================================================
         document.addEventListener('DOMContentLoaded', () => {
             carregarDashboard();
             carregarCacheItens();
             carregarCacheGrupos();
+
+            // Inicializar autocomplete de conferência após cache carregado
+            setTimeout(initConferenciaAutocomplete, 1000);
         });
     </script>
 </body>
