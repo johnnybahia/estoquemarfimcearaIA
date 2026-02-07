@@ -630,7 +630,7 @@
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <div class="search-box">
+                            <div class="search-box autocomplete-container">
                                 <i class="bi bi-search"></i>
                                 <input type="text" id="input-busca" class="form-control" placeholder="Digite o nome do item..." onkeypress="if(event.key==='Enter') buscarItem()">
                             </div>
@@ -2786,9 +2786,21 @@
             carregarCacheItens();
             carregarCacheGrupos();
 
-            // Inicializar autocomplete de conferência após cache carregado
-            setTimeout(initConferenciaAutocomplete, 1000);
+            // Inicializar autocomplete após cache carregado
+            setTimeout(() => {
+                initConferenciaAutocomplete();
+                initBuscaAutocomplete();
+            }, 1000);
         });
+
+        // Autocomplete para campo de busca/consulta
+        function initBuscaAutocomplete() {
+            criarAutocomplete('input-busca', (item) => {
+                // Ao selecionar item, preenche e busca automaticamente
+                document.getElementById('input-busca').value = item.nome;
+                buscarItem();
+            });
+        }
     </script>
 </body>
 </html>
