@@ -531,6 +531,795 @@ def api_curva_abc():
         return jsonify({'success': False, 'error': str(e)})
 
 
+# ============================================================
+# NOVOS ENDPOINTS - MOVIMENTAÇÃO E AUTOCOMPLETE
+# ============================================================
+
+@app.route('/api/autocomplete', methods=['GET'])
+def api_autocomplete():
+    """Retorna lista de itens para autocomplete"""
+    try:
+        termo = request.args.get('q', '').upper().strip()
+        limite = int(request.args.get('limite', 20))
+
+        df_idx, _ = carregar_dados_completos()
+
+        if termo:
+            # Filtrar itens que começam com o termo (prioridade) ou contêm o termo
+            df_inicio = df_idx[df_idx['Item'].str.upper().str.startswith(termo, na=False)]
+            df_contem = df_idx[
+                (df_idx['Item'].str.upper().str.contains(termo, na=False)) &
+                (~df_idx['Item'].str.upper().str.startswith(termo, na=False))
+            ]
+            df_filtrado = pd.concat([df_inicio, df_contem])
+        else:
+            df_filtrado = df_idx
+
+        # Encontrar coluna de grupo
+        col_grupo = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo', 'Categoria', 'CATEGORIA'])
+
+        itens = []
+        for _, row in df_filtrado.head(limite).iterrows():
+            item = {
+                'nome': row['Item'],
+                'saldo': float(row['Saldo']),
+                'grupo': row[col_grupo] if col_grupo and col_grupo in row else ''
+            }
+            itens.append(item)
+
+        return jsonify({
+            'success': True,
+            'itens': itens,
+            'total': len(df_filtrado)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/itens-parados', methods=['GET'])
+def api_itens_parados():
+    """Retorna itens sem movimentação há X dias"""
+    try:
+        dias = int(request.args.get('dias', 20))
+
+        df_idx, df_hist = carregar_dados_completos()
+
+        hoje = datetime.now()
+        data_limite = hoje - timedelta(days=dias)
+
+        # Encontrar última movimentação de cada item
+        if 'Data' in df_hist.columns and df_hist['Data'].notna().any():
+            ultima_mov = df_hist.groupby('Item_Norm')['Data'].max()
+
+            # Itens com última movimentação antiga ou sem movimentação
+            df_idx['Ultima_Mov'] = df_idx['Item_Norm'].map(ultima_mov)
+
+            # Itens parados: última mov < data_limite OU nunca tiveram movimento
+            df_parados = df_idx[
+                (df_idx['Ultima_Mov'].isna()) |
+                (df_idx['Ultima_Mov'] < data_limite)
+            ].copy()
+
+            df_parados['Dias_Parado'] = df_parados['Ultima_Mov'].apply(
+                lambda x: (hoje - x).days if pd.notna(x) else 999
+            )
+        else:
+            # Sem dados de data, considerar todos como parados
+            df_parados = df_idx.copy()
+            df_parados['Ultima_Mov'] = None
+            df_parados['Dias_Parado'] = 999
+
+        # Ordenar por dias parado (descendente)
+        df_parados = df_parados.sort_values('Dias_Parado', ascending=False)
+
+        # Encontrar coluna de grupo
+        col_grupo = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo', 'Categoria', 'CATEGORIA'])
+
+        itens = []
+        for _, row in df_parados.head(200).iterrows():
+            item = {
+                'nome': row['Item'],
+                'saldo': float(row['Saldo']),
+                'grupo': row[col_grupo] if col_grupo and col_grupo in row else '',
+                'dias_parado': int(row['Dias_Parado']) if row['Dias_Parado'] != 999 else 'Nunca movimentado',
+                'ultima_mov': row['Ultima_Mov'].strftime('%d/%m/%Y') if pd.notna(row['Ultima_Mov']) else 'Sem registro'
+            }
+            itens.append(item)
+
+        return jsonify({
+            'success': True,
+            'itens': itens,
+            'total': len(df_parados),
+            'dias_filtro': dias
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()})
+
+
+@app.route('/api/buscar-grupo', methods=['GET'])
+def api_buscar_grupo():
+    """Busca o grupo de um item existente"""
+    try:
+        item_nome = request.args.get('item', '').strip()
+
+        if not item_nome:
+            return jsonify({'success': False, 'error': 'Nome do item não informado'})
+
+        df_idx, _ = carregar_dados_completos()
+
+        # Buscar item
+        item_data = df_idx[df_idx['Item'].str.upper() == item_nome.upper()]
+
+        if item_data.empty:
+            return jsonify({
+                'success': True,
+                'encontrado': False,
+                'item_novo': True
+            })
+
+        # Encontrar coluna de grupo
+        col_grupo = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo', 'Categoria', 'CATEGORIA'])
+
+        item = item_data.iloc[0]
+        grupo = item[col_grupo] if col_grupo and col_grupo in item else ''
+
+        return jsonify({
+            'success': True,
+            'encontrado': True,
+            'item_novo': False,
+            'grupo': grupo,
+            'saldo_atual': float(item['Saldo'])
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/grupos', methods=['GET'])
+def api_grupos():
+    """Retorna lista de grupos disponíveis"""
+    try:
+        df_idx, _ = carregar_dados_completos()
+
+        col_grupo = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo', 'Categoria', 'CATEGORIA'])
+
+        if col_grupo:
+            grupos = df_idx[col_grupo].dropna().unique().tolist()
+            grupos = [g for g in grupos if str(g).strip()]
+            grupos.sort()
+        else:
+            grupos = []
+
+        return jsonify({
+            'success': True,
+            'grupos': grupos
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/validar-movimentacao', methods=['POST'])
+def api_validar_movimentacao():
+    """IA valida a movimentação antes de confirmar"""
+    try:
+        dados = request.json
+        tipo = dados.get('tipo', '')
+        itens = dados.get('itens', [])
+
+        if not client_groq:
+            return jsonify({'success': True, 'validacao': None, 'mensagem': 'IA não configurada'})
+
+        df_idx, df_hist = carregar_dados_completos()
+
+        # Preparar contexto para IA
+        itens_info = []
+        alertas = []
+
+        for item_info in itens:
+            item_nome = item_info.get('item', '').strip()
+            quantidade = float(item_info.get('quantidade', 0))
+
+            # Buscar dados do item
+            item_data = df_idx[df_idx['Item'].str.upper() == item_nome.upper()]
+
+            if not item_data.empty:
+                saldo_atual = float(item_data.iloc[0]['Saldo'])
+                media_diaria = float(item_data.iloc[0]['Media_Diaria'])
+                consumo_30d = float(item_data.iloc[0]['Consumo_30d'])
+
+                itens_info.append({
+                    'nome': item_nome,
+                    'quantidade': quantidade,
+                    'saldo_atual': saldo_atual,
+                    'media_diaria': media_diaria,
+                    'consumo_30d': consumo_30d,
+                    'existe': True
+                })
+
+                # Alertas automáticos
+                if tipo == 'saida' and quantidade > saldo_atual:
+                    alertas.append(f"ALERTA: Saída de {quantidade} para '{item_nome}' excede saldo atual ({saldo_atual})")
+                if quantidade > consumo_30d * 3 and consumo_30d > 0:
+                    alertas.append(f"ATENÇÃO: Quantidade {quantidade} para '{item_nome}' é muito alta (3x o consumo de 30 dias)")
+            else:
+                itens_info.append({
+                    'nome': item_nome,
+                    'quantidade': quantidade,
+                    'existe': False
+                })
+                alertas.append(f"NOVO ITEM: '{item_nome}' será cadastrado como novo")
+
+        # Consultar IA para validação
+        prompt = f"""
+Você é o validador de movimentações de estoque da Marfim Têxtil. Analise esta operação:
+
+TIPO: {tipo.upper()}
+ITENS:
+{chr(10).join([f"- {i['nome']}: {i['quantidade']} unidades" + (f" (saldo atual: {i.get('saldo_atual', 'N/A')}, média/dia: {i.get('media_diaria', 'N/A'):.1f})" if i.get('existe') else " [ITEM NOVO]") for i in itens_info])}
+
+ALERTAS DETECTADOS:
+{chr(10).join(alertas) if alertas else 'Nenhum alerta'}
+
+Responda de forma MUITO CURTA e DIRETA:
+1. A operação parece correta? (SIM/NÃO)
+2. Algum risco ou observação importante? (máximo 2 linhas)
+3. Recomendação: APROVAR, REVISAR ou REJEITAR
+
+Use português brasileiro.
+"""
+
+        resposta = consultar_ia(prompt, "Você é um validador de estoque. Seja direto e objetivo.")
+
+        return jsonify({
+            'success': True,
+            'validacao': resposta,
+            'alertas': alertas,
+            'itens_analisados': itens_info
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/analisar-parados', methods=['POST'])
+def api_analisar_parados():
+    """IA analisa itens parados e sugere ações"""
+    try:
+        itens = request.json.get('itens', [])
+
+        if not client_groq:
+            return jsonify({'success': False, 'error': 'IA não configurada'})
+
+        if not itens:
+            return jsonify({'success': False, 'error': 'Nenhum item para analisar'})
+
+        # Limitar a 20 itens para não sobrecarregar
+        itens = itens[:20]
+
+        prompt = f"""
+Analise estes {len(itens)} itens de estoque que estão PARADOS (sem movimentação):
+
+{chr(10).join([f"- {i['nome']}: Saldo {i['saldo']}, Grupo: {i.get('grupo', 'N/A')}, Parado há {i['dias_parado']} dias" for i in itens])}
+
+Forneça:
+1. DIAGNÓSTICO GERAL (2-3 linhas): Por que estes itens podem estar parados?
+2. CLASSIFICAÇÃO:
+   - Itens que parecem OBSOLETOS (podem ser descartados)
+   - Itens que precisam de PROMOÇÃO (vender rápido)
+   - Itens SAZONAIS (podem voltar a girar)
+3. AÇÕES RECOMENDADAS (bullet points práticos)
+
+Use português brasileiro. Seja direto.
+"""
+
+        resposta = consultar_ia(prompt, "Você é um analista de estoque especializado em gestão de inventário parado.")
+
+        return jsonify({
+            'success': True,
+            'analise': resposta,
+            'total_analisados': len(itens)
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/sugerir-item', methods=['GET'])
+def api_sugerir_item():
+    """IA sugere correção para nome de item digitado incorretamente"""
+    try:
+        termo = request.args.get('termo', '').strip()
+
+        if not termo or len(termo) < 3:
+            return jsonify({'success': False, 'error': 'Termo muito curto'})
+
+        df_idx, _ = carregar_dados_completos()
+
+        # Buscar itens similares
+        todos_itens = df_idx['Item'].tolist()
+
+        # Filtro básico por similaridade
+        similares = []
+        termo_upper = termo.upper()
+        for item in todos_itens:
+            item_upper = item.upper()
+            # Começa igual
+            if item_upper.startswith(termo_upper[:3]):
+                similares.append(item)
+            # Contém partes do termo
+            elif any(p in item_upper for p in termo_upper.split() if len(p) >= 3):
+                similares.append(item)
+
+        similares = similares[:10]
+
+        if not similares:
+            return jsonify({'success': True, 'sugestoes': [], 'mensagem': 'Nenhum item similar encontrado'})
+
+        if client_groq:
+            prompt = f"""
+O usuário digitou: "{termo}"
+Itens similares encontrados no estoque:
+{chr(10).join([f"- {s}" for s in similares])}
+
+Qual item o usuário provavelmente quis digitar? Responda APENAS com o nome exato do item mais provável, sem explicações.
+"""
+            sugestao_ia = consultar_ia(prompt, "Responda apenas com o nome do item, sem explicações.")
+            sugestao_ia = sugestao_ia.strip().strip('"').strip("'")
+        else:
+            sugestao_ia = similares[0] if similares else None
+
+        return jsonify({
+            'success': True,
+            'sugestao_ia': sugestao_ia,
+            'similares': similares
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/movimentacao', methods=['POST'])
+def api_movimentacao():
+    """Registra entrada ou saída de estoque"""
+    try:
+        dados = request.json
+        tipo = dados.get('tipo', '')  # 'entrada' ou 'saida'
+        itens = dados.get('itens', [])  # Lista de {item, quantidade, nf, obs, grupo}
+
+        if tipo not in ['entrada', 'saida']:
+            return jsonify({'success': False, 'error': 'Tipo deve ser "entrada" ou "saida"'})
+
+        if not itens:
+            return jsonify({'success': False, 'error': 'Nenhum item informado'})
+
+        ss = conectar_google()
+        sheet_hist = ss.worksheet("ESTOQUE")
+        sheet_idx = ss.worksheet("ÍNDICE_ITENS")
+
+        # Carregar dados atuais para validação
+        df_idx, df_hist = carregar_dados_completos()
+
+        # Identificar colunas da planilha ESTOQUE
+        colunas_hist = sheet_hist.row_values(1)
+        col_grupo = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Grupo', 'GRUPO'])
+        col_item = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Item', 'ITEM'])
+        col_data = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Data', 'DATA'])
+        col_nf = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['NF', 'Nota', 'NOTA'])
+        col_obs = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Obs', 'OBS', 'Observação', 'OBSERVAÇÃO'])
+        col_entrada = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Entrada', 'ENTRADA'])
+        col_saida = encontrar_coluna(pd.DataFrame(columns=colunas_hist), ['Saída', 'SAÍDA', 'Saida', 'SAIDA'])
+
+        resultados = []
+        data_atual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+
+        for item_info in itens:
+            item_nome = item_info.get('item', '').strip()
+            quantidade = float(item_info.get('quantidade', 0))
+            nf = item_info.get('nf', '')
+            obs = item_info.get('obs', '')
+            grupo = item_info.get('grupo', '')
+
+            if not item_nome or quantidade <= 0:
+                resultados.append({
+                    'item': item_nome,
+                    'sucesso': False,
+                    'erro': 'Item ou quantidade inválidos'
+                })
+                continue
+
+            # Verificar se item existe
+            item_existe = df_idx[df_idx['Item'].str.upper() == item_nome.upper()]
+
+            if item_existe.empty and not grupo:
+                resultados.append({
+                    'item': item_nome,
+                    'sucesso': False,
+                    'erro': 'Item novo requer grupo'
+                })
+                continue
+
+            # Buscar grupo do item existente
+            if not grupo and not item_existe.empty:
+                col_grupo_idx = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo'])
+                if col_grupo_idx:
+                    grupo = item_existe.iloc[0][col_grupo_idx]
+
+            # Preparar linha para inserir
+            nova_linha = [''] * len(colunas_hist)
+
+            for i, col in enumerate(colunas_hist):
+                col_upper = col.upper()
+                if 'GRUPO' in col_upper:
+                    nova_linha[i] = grupo
+                elif 'ITEM' in col_upper:
+                    nova_linha[i] = item_nome
+                elif 'DATA' in col_upper:
+                    nova_linha[i] = data_atual
+                elif 'NF' in col_upper or 'NOTA' in col_upper:
+                    nova_linha[i] = nf
+                elif 'OBS' in col_upper:
+                    nova_linha[i] = obs
+                elif 'ENTRADA' in col_upper:
+                    nova_linha[i] = str(quantidade).replace('.', ',') if tipo == 'entrada' else ''
+                elif 'SAÍDA' in col_upper or 'SAIDA' in col_upper:
+                    nova_linha[i] = str(quantidade).replace('.', ',') if tipo == 'saida' else ''
+
+            # Inserir linha na planilha
+            sheet_hist.append_row(nova_linha)
+
+            resultados.append({
+                'item': item_nome,
+                'sucesso': True,
+                'tipo': tipo,
+                'quantidade': quantidade,
+                'grupo': grupo
+            })
+
+        # Resumo
+        sucessos = sum(1 for r in resultados if r['sucesso'])
+        erros = len(resultados) - sucessos
+
+        return jsonify({
+            'success': True,
+            'resultados': resultados,
+            'resumo': {
+                'total': len(resultados),
+                'sucessos': sucessos,
+                'erros': erros
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
+
+# ============================================================
+# SISTEMA DE CONFERÊNCIA DE ESTOQUE
+# ============================================================
+
+@app.route('/api/lista-conferencia', methods=['GET'])
+def api_lista_conferencia():
+    """
+    Gera lista priorizada de itens para conferência.
+    Prioriza:
+    1. Itens com alta movimentação (mais chance de erro)
+    2. Itens não conferidos há muito tempo
+    3. Itens com saldo alto (mais valor em risco)
+    4. Itens com padrão de consumo irregular
+    """
+    try:
+        dias_sem_conferencia = int(request.args.get('dias', 30))
+        limite = int(request.args.get('limite', 50))
+
+        df_idx, df_hist = carregar_dados_completos()
+
+        # Encontrar coluna de última conferência (pode estar em Obs ou coluna específica)
+        col_obs = encontrar_coluna(df_idx, ['Obs', 'OBS', 'Observação', 'OBSERVAÇÃO', 'Ultima Conferencia', 'ULTIMA CONFERENCIA'])
+
+        hoje = datetime.now()
+
+        # Calcular métricas para priorização
+        df_conferencia = df_idx.copy()
+
+        # 1. Frequência de movimentação (quantas vezes movimentou nos últimos 30 dias)
+        if 'Data' in df_hist.columns and df_hist['Data'].notna().any():
+            data_30d = hoje - timedelta(days=30)
+            mov_30d = df_hist[df_hist['Data'] >= data_30d].groupby('Item_Norm').size()
+            df_conferencia['Movimentacoes_30d'] = df_conferencia['Item_Norm'].map(mov_30d).fillna(0)
+        else:
+            df_conferencia['Movimentacoes_30d'] = 0
+
+        # 2. Variabilidade do consumo (desvio padrão das saídas)
+        if 'Saída' in df_hist.columns:
+            variabilidade = df_hist.groupby('Item_Norm')['Saída'].std()
+            df_conferencia['Variabilidade'] = df_conferencia['Item_Norm'].map(variabilidade).fillna(0)
+        else:
+            df_conferencia['Variabilidade'] = 0
+
+        # 3. Tentar extrair última conferência do campo Obs (formato: "CONF:DD/MM/YYYY")
+        df_conferencia['Ultima_Conferencia'] = None
+        df_conferencia['Dias_Sem_Conferencia'] = 999
+
+        if col_obs and col_obs in df_conferencia.columns:
+            for idx, row in df_conferencia.iterrows():
+                obs = str(row[col_obs]) if pd.notna(row[col_obs]) else ''
+                # Procurar padrão CONF:DD/MM/YYYY ou similar
+                import re
+                match = re.search(r'CONF[:\s]*(\d{2}/\d{2}/\d{4})', obs.upper())
+                if match:
+                    try:
+                        data_conf = datetime.strptime(match.group(1), '%d/%m/%Y')
+                        df_conferencia.at[idx, 'Ultima_Conferencia'] = data_conf
+                        df_conferencia.at[idx, 'Dias_Sem_Conferencia'] = (hoje - data_conf).days
+                    except:
+                        pass
+
+        # 4. Calcular score de prioridade
+        # Quanto maior, mais urgente a conferência
+        df_conferencia['Score_Prioridade'] = (
+            df_conferencia['Movimentacoes_30d'] * 10 +  # Alta movimentação = prioridade
+            df_conferencia['Variabilidade'] * 5 +       # Alta variabilidade = prioridade
+            df_conferencia['Saldo'] / 100 +             # Saldo alto = prioridade
+            df_conferencia['Dias_Sem_Conferencia'] * 2  # Muito tempo sem conferir = prioridade
+        )
+
+        # Filtrar itens que precisam de conferência
+        df_conferencia = df_conferencia[
+            (df_conferencia['Dias_Sem_Conferencia'] >= dias_sem_conferencia) |
+            (df_conferencia['Movimentacoes_30d'] >= 10)  # Alta movimentação
+        ]
+
+        # Ordenar por prioridade
+        df_conferencia = df_conferencia.sort_values('Score_Prioridade', ascending=False)
+
+        # Encontrar coluna de grupo
+        col_grupo = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo', 'Categoria', 'CATEGORIA'])
+
+        # Preparar lista
+        itens = []
+        for _, row in df_conferencia.head(limite).iterrows():
+            ultima_conf = row['Ultima_Conferencia']
+            itens.append({
+                'nome': row['Item'],
+                'grupo': row[col_grupo] if col_grupo and col_grupo in row else '',
+                'saldo_sistema': float(row['Saldo']),
+                'movimentacoes_30d': int(row['Movimentacoes_30d']),
+                'consumo_30d': float(row['Consumo_30d']),
+                'variabilidade': float(row['Variabilidade']),
+                'ultima_conferencia': ultima_conf.strftime('%d/%m/%Y') if pd.notna(ultima_conf) else 'Nunca',
+                'dias_sem_conferencia': int(row['Dias_Sem_Conferencia']) if row['Dias_Sem_Conferencia'] != 999 else 'Nunca',
+                'prioridade': 'ALTA' if row['Score_Prioridade'] > 100 else ('MÉDIA' if row['Score_Prioridade'] > 50 else 'NORMAL'),
+                'score': float(row['Score_Prioridade'])
+            })
+
+        # Estatísticas
+        stats = {
+            'total_itens': len(df_idx),
+            'itens_conferir': len(df_conferencia),
+            'alta_prioridade': len([i for i in itens if i['prioridade'] == 'ALTA']),
+            'media_prioridade': len([i for i in itens if i['prioridade'] == 'MÉDIA']),
+            'nunca_conferidos': len([i for i in itens if i['ultima_conferencia'] == 'Nunca'])
+        }
+
+        return jsonify({
+            'success': True,
+            'itens': itens,
+            'estatisticas': stats,
+            'filtro_dias': dias_sem_conferencia
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()})
+
+
+@app.route('/api/registrar-conferencia', methods=['POST'])
+def api_registrar_conferencia():
+    """Registra conferência de um item"""
+    try:
+        dados = request.json
+        item_nome = dados.get('item', '').strip()
+        saldo_fisico = float(dados.get('saldo_fisico', 0))
+        obs = dados.get('obs', '')
+
+        if not item_nome:
+            return jsonify({'success': False, 'error': 'Nome do item não informado'})
+
+        ss = conectar_google()
+        df_idx, df_hist = carregar_dados_completos()
+
+        # Buscar item
+        item_data = df_idx[df_idx['Item'].str.upper() == item_nome.upper()]
+        if item_data.empty:
+            return jsonify({'success': False, 'error': 'Item não encontrado'})
+
+        saldo_sistema = float(item_data.iloc[0]['Saldo'])
+        divergencia = saldo_fisico - saldo_sistema
+
+        # Registrar movimentação de ajuste se houver divergência
+        resultado = {
+            'item': item_nome,
+            'saldo_sistema': saldo_sistema,
+            'saldo_fisico': saldo_fisico,
+            'divergencia': divergencia,
+            'ajuste_registrado': False
+        }
+
+        if abs(divergencia) > 0.01:  # Se há divergência significativa
+            sheet_hist = ss.worksheet("ESTOQUE")
+            colunas_hist = sheet_hist.row_values(1)
+
+            # Encontrar grupo do item
+            col_grupo = encontrar_coluna(df_idx, ['Grupo', 'GRUPO', 'grupo'])
+            grupo = item_data.iloc[0][col_grupo] if col_grupo and col_grupo in item_data.iloc[0] else ''
+
+            data_atual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+
+            # Preparar linha de ajuste
+            nova_linha = [''] * len(colunas_hist)
+            tipo_ajuste = 'entrada' if divergencia > 0 else 'saida'
+
+            for i, col in enumerate(colunas_hist):
+                col_upper = col.upper()
+                if 'GRUPO' in col_upper:
+                    nova_linha[i] = grupo
+                elif 'ITEM' in col_upper:
+                    nova_linha[i] = item_nome
+                elif 'DATA' in col_upper:
+                    nova_linha[i] = data_atual
+                elif 'OBS' in col_upper:
+                    nova_linha[i] = f"CONFERÊNCIA: {obs}. Ajuste de {divergencia:+.2f}. CONF:{datetime.now().strftime('%d/%m/%Y')}"
+                elif 'ENTRADA' in col_upper:
+                    nova_linha[i] = str(abs(divergencia)).replace('.', ',') if divergencia > 0 else ''
+                elif 'SAÍDA' in col_upper or 'SAIDA' in col_upper:
+                    nova_linha[i] = str(abs(divergencia)).replace('.', ',') if divergencia < 0 else ''
+
+            sheet_hist.append_row(nova_linha)
+            resultado['ajuste_registrado'] = True
+            resultado['tipo_ajuste'] = tipo_ajuste
+
+        return jsonify({
+            'success': True,
+            'resultado': resultado
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()})
+
+
+@app.route('/api/analisar-divergencias', methods=['POST'])
+def api_analisar_divergencias():
+    """IA analisa padrões de divergência e sugere ações"""
+    try:
+        conferencias = request.json.get('conferencias', [])
+
+        if not client_groq:
+            return jsonify({'success': False, 'error': 'IA não configurada'})
+
+        if not conferencias:
+            return jsonify({'success': False, 'error': 'Nenhuma conferência para analisar'})
+
+        # Limitar análise
+        conferencias = conferencias[:15]
+
+        # Calcular estatísticas
+        total_divergencias = sum(1 for c in conferencias if c.get('divergencia', 0) != 0)
+        soma_positiva = sum(c['divergencia'] for c in conferencias if c.get('divergencia', 0) > 0)
+        soma_negativa = sum(c['divergencia'] for c in conferencias if c.get('divergencia', 0) < 0)
+
+        prompt = f"""
+Analise estas conferências de estoque de uma indústria têxtil (produtos em KG, consumo por metro):
+
+CONFERÊNCIAS REALIZADAS:
+{chr(10).join([f"- {c['item']}: Sistema {c['saldo_sistema']:.1f}kg, Físico {c['saldo_fisico']:.1f}kg, Divergência {c['divergencia']:+.1f}kg" for c in conferencias])}
+
+ESTATÍSTICAS:
+- Total com divergência: {total_divergencias} de {len(conferencias)}
+- Soma divergências positivas (sobras): {soma_positiva:+.1f}kg
+- Soma divergências negativas (faltas): {soma_negativa:.1f}kg
+
+CONTEXTO: Produtos têxteis em KG, saídas calculadas por peso/metro × metros do pedido.
+
+Responda:
+1. PADRÃO DETECTADO: Qual o principal problema? (erro de cálculo, perdas, furto, erros de pesagem?)
+2. ITENS CRÍTICOS: Quais itens merecem atenção especial?
+3. CAUSA PROVÁVEL: Por que está acontecendo?
+4. AÇÕES RECOMENDADAS: O que fazer para resolver? (bullet points práticos)
+5. FREQUÊNCIA SUGERIDA: Com que frequência conferir estes itens?
+
+Seja direto e prático. Use português brasileiro.
+"""
+
+        resposta = consultar_ia(prompt, "Você é um especialista em gestão de estoque têxtil.")
+
+        return jsonify({
+            'success': True,
+            'analise': resposta,
+            'estatisticas': {
+                'total_conferencias': len(conferencias),
+                'com_divergencia': total_divergencias,
+                'sobras_kg': round(soma_positiva, 2),
+                'faltas_kg': round(abs(soma_negativa), 2)
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/sugerir-conferencia-ia', methods=['GET'])
+def api_sugerir_conferencia_ia():
+    """IA sugere quais itens conferir com base nos padrões"""
+    try:
+        if not client_groq:
+            return jsonify({'success': False, 'error': 'IA não configurada'})
+
+        df_idx, df_hist = carregar_dados_completos()
+
+        # Coletar dados para análise
+        hoje = datetime.now()
+        data_30d = hoje - timedelta(days=30)
+
+        # Top 20 por movimentação
+        if 'Data' in df_hist.columns and df_hist['Data'].notna().any():
+            mov_30d = df_hist[df_hist['Data'] >= data_30d].groupby('Item_Norm').agg({
+                'Saída': ['sum', 'count', 'std']
+            }).reset_index()
+            mov_30d.columns = ['Item_Norm', 'Saida_Total', 'Qtd_Movimentos', 'Variabilidade']
+            mov_30d = mov_30d.sort_values('Qtd_Movimentos', ascending=False).head(20)
+
+            # Juntar com dados do índice
+            df_analise = df_idx.merge(mov_30d, on='Item_Norm', how='inner')
+        else:
+            df_analise = df_idx.nlargest(20, 'Consumo_30d')
+            df_analise['Qtd_Movimentos'] = 0
+            df_analise['Variabilidade'] = 0
+
+        # Preparar contexto para IA
+        itens_contexto = []
+        for _, row in df_analise.iterrows():
+            itens_contexto.append({
+                'nome': row['Item'],
+                'saldo': float(row['Saldo']),
+                'consumo_30d': float(row['Consumo_30d']),
+                'movimentos': int(row.get('Qtd_Movimentos', 0)),
+                'variabilidade': float(row.get('Variabilidade', 0))
+            })
+
+        prompt = f"""
+Você é o supervisor de estoque da Marfim Têxtil. Analise estes {len(itens_contexto)} itens com maior movimentação:
+
+{chr(10).join([f"- {i['nome']}: Saldo {i['saldo']:.0f}kg, Consumo 30d {i['consumo_30d']:.0f}kg, {i['movimentos']} movimentos, variabilidade {i['variabilidade']:.1f}" for i in itens_contexto])}
+
+CONTEXTO: Indústria têxtil, produtos em KG, consumo calculado por metro.
+
+Selecione os 10 itens que MAIS PRECISAM de conferência HOJE e explique por quê.
+Considere:
+- Alta movimentação = mais chance de erro
+- Alta variabilidade = padrão irregular, possível problema
+- Saldo alto = maior risco financeiro
+
+Responda com a lista dos 10 itens prioritários e uma justificativa CURTA para cada.
+"""
+
+        resposta = consultar_ia(prompt, "Você é um supervisor de estoque experiente. Seja direto.")
+
+        return jsonify({
+            'success': True,
+            'sugestao_ia': resposta,
+            'itens_analisados': len(itens_contexto)
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 @app.route('/api/debug', methods=['GET'])
 def api_debug():
     """Endpoint de diagnóstico - mostra informações sobre os dados carregados"""
