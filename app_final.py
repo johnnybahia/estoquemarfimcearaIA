@@ -10,6 +10,22 @@ import numpy as np
 from datetime import datetime, timedelta
 from groq import Groq
 import os
+from validador_input import (
+    validar_input_generico,
+    validar_nome_item,
+    validar_quantidade,
+    validar_observacao,
+    validar_numero_documento,
+    validar_grupo,
+    validar_pergunta_chat,
+    validar_movimentacao_completa,
+    validar_input_com_ia,
+    normalizar_texto_input,
+    normalizar_nome_item,
+    normalizar_observacao,
+    normalizar_numero_documento,
+    detectar_gibberish
+)
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
@@ -260,14 +276,55 @@ def api_dashboard():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/api/validar-input', methods=['POST'])
+def api_validar_input():
+    """Valida e normaliza qualquer input do usuário"""
+    try:
+        texto = request.json.get('texto', '')
+        tipo_campo = request.json.get('tipo', 'texto')
+        usar_ia = request.json.get('usar_ia', False)
+
+        resultado = validar_input_generico(texto, tipo_campo)
+
+        # Validação adicional com IA se solicitado
+        if usar_ia and client_groq and resultado['valido'] and resultado['texto_normalizado']:
+            tipos_ia = {
+                'nome_item': 'nome de item de estoque têxtil',
+                'grupo': 'nome de grupo/categoria de estoque têxtil',
+                'observacao': 'observação de movimentação de estoque'
+            }
+            tipo_ia = tipos_ia.get(tipo_campo)
+            if tipo_ia:
+                valido_ia, corrigido, motivo = validar_input_com_ia(
+                    client_groq, resultado['texto_normalizado'], tipo_ia
+                )
+                resultado['validacao_ia'] = {
+                    'valido': valido_ia,
+                    'sugestao': corrigido,
+                    'motivo': motivo
+                }
+
+        return jsonify({'success': True, **resultado})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 @app.route('/api/buscar', methods=['POST'])
 def api_buscar():
     """Busca itens por nome"""
     try:
-        termo = request.json.get('item', '').upper()
+        termo = request.json.get('item', '')
+        termo_norm = normalizar_texto_input(termo, uppercase=True)
+
+        # Validar busca
+        if termo_norm:
+            eh_gibberish, motivo = detectar_gibberish(termo_norm)
+            if eh_gibberish:
+                return jsonify({'success': False, 'error': f'Termo de busca inválido: {motivo}'})
+
         df_idx, _ = carregar_dados_completos()
 
-        resultado = df_idx[df_idx['Item'].str.upper().str.contains(termo, na=False)]
+        resultado = df_idx[df_idx['Item'].str.upper().str.contains(termo_norm, na=False)]
 
         itens = resultado[['Item', 'Saldo', 'Consumo_30d', 'Dias_Cobertura']].head(50).to_dict('records')
 
@@ -305,7 +362,10 @@ def api_item_detalhe(item_nome):
 def api_analisar():
     """Análise IA de um item"""
     try:
-        item_nome = request.json.get('item', '').upper()
+        item_nome_raw = request.json.get('item', '')
+        valido, item_nome, msg = validar_nome_item(item_nome_raw)
+        if not valido:
+            return jsonify({'success': False, 'error': msg})
         df_idx, df_hist = carregar_dados_completos()
 
         # Dados do item
@@ -437,6 +497,12 @@ def api_chat():
     try:
         pergunta = request.json.get('pergunta', '')
 
+        # Validar pergunta
+        valido, pergunta_norm, msg = validar_pergunta_chat(pergunta)
+        if not valido:
+            return jsonify({'success': False, 'error': msg})
+        pergunta = pergunta_norm
+
         if not pergunta:
             return jsonify({'success': False, 'error': 'Pergunta vazia'})
 
@@ -544,7 +610,7 @@ def api_curva_abc():
 def api_autocomplete():
     """Retorna lista de itens para autocomplete"""
     try:
-        termo = request.args.get('q', '').upper().strip()
+        termo = normalizar_texto_input(request.args.get('q', ''), uppercase=True)
         limite = int(request.args.get('limite', 20))
 
         df_idx, _ = carregar_dados_completos()
@@ -811,13 +877,27 @@ def api_adicionar_dado_auxiliar():
     try:
         dados = request.json
         tipo = dados.get('tipo', '')  # 'grupo', 'unidade' ou 'observacao'
-        valor = dados.get('valor', '').strip()
+        valor_raw = dados.get('valor', '').strip()
 
-        if not tipo or not valor:
+        if not tipo or not valor_raw:
             return jsonify({'success': False, 'error': 'Tipo e valor são obrigatórios'})
 
         if tipo not in ['grupo', 'unidade', 'observacao']:
             return jsonify({'success': False, 'error': 'Tipo inválido'})
+
+        # Validar e normalizar o valor conforme o tipo
+        if tipo == 'grupo':
+            valido, valor, msg = validar_grupo(valor_raw)
+        elif tipo == 'observacao':
+            valido, valor, msg = validar_observacao(valor_raw)
+        else:
+            valor = normalizar_texto_input(valor_raw, uppercase=True)
+            eh_gibberish, motivo = detectar_gibberish(valor)
+            valido = not eh_gibberish
+            msg = motivo
+
+        if not valido:
+            return jsonify({'success': False, 'error': msg})
 
         ss = conectar_google()
         sheet_dados = ss.worksheet("DADOS")
@@ -870,8 +950,19 @@ def api_validar_movimentacao():
         alertas = []
 
         for item_info in itens:
-            item_nome = item_info.get('item', '').strip()
-            quantidade = float(item_info.get('quantidade', 0))
+            item_nome_raw = item_info.get('item', '').strip()
+
+            # Validar e normalizar nome do item
+            valido_nome, item_nome, msg_nome = validar_nome_item(item_nome_raw)
+            if not valido_nome:
+                alertas.append(f"ERRO DE INPUT: {msg_nome} (digitado: '{item_nome_raw}')")
+                continue
+
+            # Validar quantidade
+            valido_qtd, quantidade, msg_qtd = validar_quantidade(item_info.get('quantidade', 0))
+            if not valido_qtd:
+                alertas.append(f"ERRO DE INPUT: {msg_qtd} para item '{item_nome}'")
+                continue
 
             # Buscar dados do item
             item_data = df_idx[df_idx['Item'].str.upper() == item_nome.upper()]
@@ -982,7 +1073,7 @@ Use português brasileiro. Seja direto.
 def api_sugerir_item():
     """IA sugere correção para nome de item digitado incorretamente"""
     try:
-        termo = request.args.get('termo', '').strip()
+        termo = normalizar_texto_input(request.args.get('termo', ''), uppercase=False)
 
         if not termo or len(termo) < 3:
             return jsonify({'success': False, 'error': 'Termo muito curto'})
@@ -1037,8 +1128,28 @@ def api_movimentacao():
     """Registra entrada ou saída de estoque"""
     try:
         dados = request.json
-        tipo = dados.get('tipo', '')  # 'entrada' ou 'saida'
-        itens = dados.get('itens', [])  # Lista de {item, quantidade, nf, obs, grupo, unidade, saldo_atual, novo_saldo, valor_unitario}
+
+        # Validação completa dos dados de entrada
+        validacao = validar_movimentacao_completa(dados, client_groq)
+        if not validacao['valido']:
+            return jsonify({
+                'success': False,
+                'error': 'Dados inválidos',
+                'erros_validacao': validacao['erros'],
+                'avisos': validacao['avisos']
+            })
+
+        # Usar dados normalizados
+        tipo = validacao['dados_normalizados']['tipo']
+        itens = dados.get('itens', [])
+
+        # Normalizar cada item com os dados validados
+        itens_normalizados = validacao['dados_normalizados']['itens']
+        for i, item in enumerate(itens):
+            if i < len(itens_normalizados):
+                item['item'] = itens_normalizados[i]['item']
+                if 'obs' in itens_normalizados[i]:
+                    item['obs'] = itens_normalizados[i]['obs']
 
         if tipo not in ['entrada', 'saida']:
             return jsonify({'success': False, 'error': 'Tipo deve ser "entrada" ou "saida"'})
@@ -1322,9 +1433,14 @@ def api_registrar_conferencia():
     """Registra conferência de um item"""
     try:
         dados = request.json
-        item_nome = dados.get('item', '').strip()
+
+        # Validar nome do item
+        valido, item_nome, msg = validar_nome_item(dados.get('item', ''))
+        if not valido:
+            return jsonify({'success': False, 'error': msg})
+
         saldo_fisico = float(dados.get('saldo_fisico', 0))
-        obs = dados.get('obs', '')
+        obs = normalizar_observacao(dados.get('obs', ''))
 
         if not item_nome:
             return jsonify({'success': False, 'error': 'Nome do item não informado'})

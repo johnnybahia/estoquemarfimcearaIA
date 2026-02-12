@@ -1389,6 +1389,162 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // ============================================================
+        // VALIDADOR INTELIGENTE DE INPUTS (Frontend)
+        // ============================================================
+
+        /**
+         * Detecta se o texto é gibberish/sem sentido
+         * Exemplos: ",,,,,,,", "asdfgh", "!!!!!", "     "
+         */
+        function detectarGibberish(texto) {
+            if (!texto || typeof texto !== 'string') return { gibberish: true, motivo: 'Entrada vazia' };
+
+            const limpo = texto.trim();
+            if (!limpo) return { gibberish: true, motivo: 'Entrada contém apenas espaços' };
+
+            // Apenas caracteres especiais/pontuação
+            const apenasAlfanum = limpo.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+            if (!apenasAlfanum) return { gibberish: true, motivo: 'Entrada não contém letras ou números válidos' };
+
+            // Proporção de caracteres especiais muito alta
+            const semAlfanum = limpo.replace(/[a-zA-ZÀ-ÿ0-9\s]/g, '');
+            if (semAlfanum.length > limpo.length * 0.5 && limpo.length > 3) {
+                return { gibberish: true, motivo: 'Entrada contém muitos caracteres especiais' };
+            }
+
+            // Mesmo caractere repetido excessivamente
+            const semEspacos = limpo.replace(/\s/g, '');
+            for (const char of new Set(semEspacos)) {
+                const contagem = (semEspacos.match(new RegExp(char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+                if (contagem > semEspacos.length * 0.6 && semEspacos.length > 3) {
+                    return { gibberish: true, motivo: `Caractere '${char}' repetido excessivamente` };
+                }
+            }
+
+            // Padrões de teclado
+            const padroesT = ['asdf', 'qwer', 'zxcv', 'hjkl', 'uiop', 'asdfjkl', 'qwertyuiop'];
+            const textoLow = limpo.toLowerCase().replace(/\s/g, '');
+            for (const p of padroesT) {
+                if (textoLow.includes(p) && textoLow.length <= p.length + 4) {
+                    return { gibberish: true, motivo: 'Entrada parece ser digitação aleatória' };
+                }
+            }
+
+            // Proporção de vogais muito baixa
+            const vogais = (textoLow.match(/[aeiouáéíóúâêîôûãõàè]/g) || []).length;
+            const letras = (textoLow.match(/[a-záéíóúâêîôûãõàè]/g) || []).length;
+            if (letras > 5 && vogais / letras < 0.15) {
+                return { gibberish: true, motivo: 'Texto não parece conter palavras válidas' };
+            }
+
+            return { gibberish: false, motivo: 'OK' };
+        }
+
+        /**
+         * Normaliza texto de input: remove espaços extras, capitaliza, limpa caracteres invisíveis
+         */
+        function normalizarInput(texto, uppercase = true) {
+            if (!texto || typeof texto !== 'string') return '';
+
+            // Remover caracteres de controle e invisíveis
+            let t = texto.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '');
+            t = t.replace(/[\u200b\u200c\u200d\ufeff\u00ad]/g, '');
+
+            // Substituir tabs e múltiplos espaços
+            t = t.replace(/[\t\r\n]+/g, ' ');
+            t = t.replace(/ {2,}/g, ' ');
+            t = t.trim();
+
+            if (uppercase) t = t.toUpperCase();
+            return t;
+        }
+
+        /**
+         * Normaliza nome de item de estoque
+         */
+        function normalizarNomeItem(nome) {
+            let n = normalizarInput(nome, true);
+            if (!n) return '';
+            n = n.replace(/^[^\w]+/, '').replace(/[^\w]+$/, '');
+            n = n.replace(/\s*\.\s*/g, ' ');
+            n = n.replace(/\s*-\s*/g, ' - ');
+            n = n.replace(/ {2,}/g, ' ');
+            n = n.replace(/['"]/g, '');
+            return n.trim();
+        }
+
+        /**
+         * Valida um campo de input e mostra feedback visual
+         * @returns {boolean} true se válido
+         */
+        function validarCampoInput(inputElement, tipo = 'texto') {
+            const valor = inputElement.value;
+            const normalizado = tipo === 'nome_item' ? normalizarNomeItem(valor) : normalizarInput(valor, tipo !== 'observacao' && tipo !== 'chat');
+
+            // Remover feedback anterior
+            inputElement.classList.remove('is-invalid', 'is-valid');
+            const feedbackEl = inputElement.parentElement.querySelector('.invalid-feedback');
+            if (feedbackEl) feedbackEl.remove();
+
+            if (!normalizado) {
+                mostrarFeedbackInvalido(inputElement, 'Campo obrigatório');
+                return false;
+            }
+
+            const check = detectarGibberish(normalizado);
+            if (check.gibberish) {
+                mostrarFeedbackInvalido(inputElement, check.motivo);
+                return false;
+            }
+
+            // Validações específicas por tipo
+            if (tipo === 'nome_item' && normalizado.length < 2) {
+                mostrarFeedbackInvalido(inputElement, 'Nome muito curto (mínimo 2 caracteres)');
+                return false;
+            }
+
+            if (tipo === 'nome_item' && !/[A-ZÀ-Ÿ]/.test(normalizado)) {
+                mostrarFeedbackInvalido(inputElement, 'Nome deve conter letras');
+                return false;
+            }
+
+            // Auto-normalizar o valor no campo
+            if (tipo === 'nome_item') {
+                inputElement.value = normalizado;
+            }
+
+            inputElement.classList.add('is-valid');
+            return true;
+        }
+
+        function mostrarFeedbackInvalido(inputElement, mensagem) {
+            inputElement.classList.add('is-invalid');
+            const existente = inputElement.parentElement.querySelector('.invalid-feedback');
+            if (existente) existente.remove();
+            const div = document.createElement('div');
+            div.className = 'invalid-feedback';
+            div.style.display = 'block';
+            div.textContent = mensagem;
+            inputElement.parentElement.appendChild(div);
+        }
+
+        /**
+         * Validação assíncrona com backend (IA) para campos importantes
+         */
+        async function validarComIA(texto, tipoCampo) {
+            try {
+                const resp = await fetch('/api/validar-input', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ texto, tipo: tipoCampo, usar_ia: true })
+                });
+                return await resp.json();
+            } catch (e) {
+                return { success: true, valido: true, texto_normalizado: texto };
+            }
+        }
+
+        // ============================================================
         // NAVEGAÇÃO
         // ============================================================
         document.querySelectorAll('.nav-item').forEach(item => {
@@ -1525,8 +1681,19 @@
         // CONSULTA
         // ============================================================
         async function buscarItem() {
-            const termo = document.getElementById('input-busca').value;
-            if (!termo) return;
+            const inputBusca = document.getElementById('input-busca');
+            const termoRaw = inputBusca.value;
+            if (!termoRaw) return;
+
+            // Normalizar e validar
+            const termo = normalizarInput(termoRaw, true);
+            const check = detectarGibberish(termo);
+            if (check.gibberish) {
+                mostrarFeedbackInvalido(inputBusca, check.motivo);
+                return;
+            }
+            inputBusca.classList.remove('is-invalid');
+            inputBusca.value = termo;
 
             document.getElementById('loading-busca').classList.add('show');
             document.getElementById('resultado-busca').innerHTML = '';
@@ -1744,8 +1911,16 @@
         // ============================================================
         async function enviarChat() {
             const input = document.getElementById('input-chat');
-            const pergunta = input.value.trim();
+            const pergunta = normalizarInput(input.value, false);
             if (!pergunta) return;
+
+            // Validar entrada do chat
+            const check = detectarGibberish(pergunta);
+            if (check.gibberish) {
+                mostrarFeedbackInvalido(input, check.motivo);
+                return;
+            }
+            input.classList.remove('is-invalid');
 
             const container = document.getElementById('chat-messages');
 
@@ -2471,25 +2646,48 @@
                 return;
             }
 
-            const nf = document.getElementById(`${tipo}-nf`).value.trim();
-            const obs = document.getElementById(`${tipo}-obs`).value.trim();
+            const nfInput = document.getElementById(`${tipo}-nf`);
+            const obsInput = document.getElementById(`${tipo}-obs`);
 
-            // Validar campos obrigatórios
-            if (!nf) {
+            // Normalizar e validar NF/Pedido
+            const nfRaw = nfInput.value;
+            const nfNorm = normalizarInput(nfRaw, true).replace(/\s+/g, '');
+            if (!nfNorm) {
                 alert('O campo NF/Pedido é obrigatório!');
-                document.getElementById(`${tipo}-nf`).focus();
-                document.getElementById(`${tipo}-nf`).classList.add('is-invalid');
+                mostrarFeedbackInvalido(nfInput, 'NF/Pedido é obrigatório');
+                nfInput.focus();
                 return;
             }
-            document.getElementById(`${tipo}-nf`).classList.remove('is-invalid');
+            const checkNf = detectarGibberish(nfNorm);
+            if (checkNf.gibberish) {
+                alert(`NF/Pedido inválido: ${checkNf.motivo}`);
+                mostrarFeedbackInvalido(nfInput, checkNf.motivo);
+                nfInput.focus();
+                return;
+            }
+            nfInput.classList.remove('is-invalid');
+            nfInput.value = nfNorm;
+            const nf = nfNorm;
 
-            if (!obs) {
+            // Normalizar e validar Observação
+            const obsRaw = obsInput.value;
+            const obsNorm = normalizarInput(obsRaw, false);
+            if (!obsNorm) {
                 alert('O campo Observação é obrigatório!');
-                document.getElementById(`${tipo}-obs`).focus();
-                document.getElementById(`${tipo}-obs`).classList.add('is-invalid');
+                mostrarFeedbackInvalido(obsInput, 'Observação é obrigatória');
+                obsInput.focus();
                 return;
             }
-            document.getElementById(`${tipo}-obs`).classList.remove('is-invalid');
+            const checkObs = detectarGibberish(obsNorm);
+            if (checkObs.gibberish) {
+                alert(`Observação inválida: ${checkObs.motivo}`);
+                mostrarFeedbackInvalido(obsInput, checkObs.motivo);
+                obsInput.focus();
+                return;
+            }
+            obsInput.classList.remove('is-invalid');
+            obsInput.value = obsNorm;
+            const obs = obsNorm;
 
             // Verificar se é entrada com NF
             const entradaComNF = tipo === 'entrada' && document.getElementById('entrada-com-nf')?.checked;
@@ -2501,7 +2699,9 @@
                 if (temErro) return;
 
                 const id = linha.id;
-                const nome = document.getElementById(`${id}-nome`).value.trim();
+                const nomeInput = document.getElementById(`${id}-nome`);
+                const nomeRaw = nomeInput.value.trim();
+                const nome = normalizarNomeItem(nomeRaw);
                 const qtd = parseFloat(document.getElementById(`${id}-qtd`).value) || 0;
                 const grupo = document.getElementById(`${id}-grupo`).value;
                 const unidade = document.getElementById(`${id}-unidade`).value || 'UN';
@@ -2509,14 +2709,37 @@
                 const valorUnit = parseFloat(document.getElementById(`${id}-valor`).value) || 0;
                 const itemNovo = document.getElementById(`${id}-item-novo`).value === 'true';
 
+                // Validar nome do item (gibberish, vazio, etc.)
                 if (!nome) {
                     alert('Preencha o nome do item');
-                    document.getElementById(`${id}-nome`).classList.add('is-invalid');
+                    mostrarFeedbackInvalido(nomeInput, 'Nome do item é obrigatório');
                     temErro = true;
                     return;
                 }
+                const checkNome = detectarGibberish(nome);
+                if (checkNome.gibberish) {
+                    alert(`Nome de item inválido: ${checkNome.motivo}`);
+                    mostrarFeedbackInvalido(nomeInput, checkNome.motivo);
+                    temErro = true;
+                    return;
+                }
+                if (!/[A-ZÀ-Ÿ]/.test(nome)) {
+                    alert('Nome do item deve conter letras');
+                    mostrarFeedbackInvalido(nomeInput, 'Nome deve conter letras');
+                    temErro = true;
+                    return;
+                }
+                // Auto-normalizar nome no campo
+                nomeInput.value = nome;
+
                 if (qtd <= 0) {
                     alert(`Quantidade inválida para o item: ${nome}`);
+                    document.getElementById(`${id}-qtd`).classList.add('is-invalid');
+                    temErro = true;
+                    return;
+                }
+                if (qtd > 999999) {
+                    alert(`Quantidade muito alta para o item: ${nome}. Verifique o valor.`);
                     document.getElementById(`${id}-qtd`).classList.add('is-invalid');
                     temErro = true;
                     return;
@@ -3384,13 +3607,31 @@
         async function adicionarDadoAuxiliar(tipo) {
             const inputId = `novo-${tipo}`;
             const input = document.getElementById(inputId);
-            const valor = input.value.trim();
+            const valorRaw = input.value.trim();
 
-            if (!valor) {
+            if (!valorRaw) {
                 alert('Digite um valor para adicionar');
                 input.focus();
                 return;
             }
+
+            // Normalizar e validar
+            const valor = normalizarInput(valorRaw, true);
+            const check = detectarGibberish(valor);
+            if (check.gibberish) {
+                alert(`Valor inválido: ${check.motivo}`);
+                mostrarFeedbackInvalido(input, check.motivo);
+                input.focus();
+                return;
+            }
+            if (!/[A-ZÀ-Ÿ]/.test(valor) && tipo !== 'unidade') {
+                alert('O valor deve conter letras');
+                mostrarFeedbackInvalido(input, 'Deve conter letras');
+                input.focus();
+                return;
+            }
+            input.classList.remove('is-invalid');
+            input.value = valor;
 
             try {
                 const response = await fetch('/api/adicionar-dado-auxiliar', {
@@ -3431,6 +3672,45 @@
                 initGrupoComprasAutocomplete();
                 initObservacaoAutocomplete();
             }, 1000);
+
+            // Validação em tempo real nos campos de texto principais
+            document.addEventListener('blur', function(e) {
+                const el = e.target;
+                if (el.tagName !== 'INPUT' || el.type !== 'text') return;
+                const id = el.id || '';
+
+                // Auto-normalizar campos de nome de item ao perder foco
+                if (id.includes('-nome') && el.closest('.mov-item-row')) {
+                    const val = el.value.trim();
+                    if (val) {
+                        el.value = normalizarNomeItem(val);
+                        const check = detectarGibberish(el.value);
+                        if (check.gibberish) {
+                            mostrarFeedbackInvalido(el, check.motivo);
+                        } else {
+                            el.classList.remove('is-invalid');
+                            const fb = el.parentElement.querySelector('.invalid-feedback');
+                            if (fb) fb.remove();
+                        }
+                    }
+                }
+
+                // Auto-normalizar campos NF
+                if (id.includes('-nf') && !id.includes('conf')) {
+                    const val = el.value.trim();
+                    if (val) {
+                        el.value = normalizarInput(val, true).replace(/\s+/g, '');
+                    }
+                }
+
+                // Auto-normalizar campos de novo grupo/unidade/observação
+                if (id.startsWith('novo-')) {
+                    const val = el.value.trim();
+                    if (val) {
+                        el.value = normalizarInput(val, true);
+                    }
+                }
+            }, true);
         });
 
         // Autocomplete para campo de busca/consulta
