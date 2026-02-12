@@ -1406,6 +1406,9 @@
             const apenasAlfanum = limpo.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
             if (!apenasAlfanum) return { gibberish: true, motivo: 'Entrada não contém letras ou números válidos' };
 
+            // Se é puramente numérico (código de produto), aceitar
+            if (/^[\d\s./-]+$/.test(limpo)) return { gibberish: false, motivo: 'OK' };
+
             // Proporção de caracteres especiais muito alta
             const semAlfanum = limpo.replace(/[a-zA-ZÀ-ÿ0-9\s]/g, '');
             if (semAlfanum.length > limpo.length * 0.5 && limpo.length > 3) {
@@ -1503,8 +1506,8 @@
                 return false;
             }
 
-            if (tipo === 'nome_item' && !/[A-ZÀ-Ÿ]/.test(normalizado)) {
-                mostrarFeedbackInvalido(inputElement, 'Nome deve conter letras');
+            if (tipo === 'nome_item' && !/[A-ZÀ-Ÿ0-9]/.test(normalizado)) {
+                mostrarFeedbackInvalido(inputElement, 'Nome deve conter letras ou números');
                 return false;
             }
 
@@ -2723,9 +2726,9 @@
                     temErro = true;
                     return;
                 }
-                if (!/[A-ZÀ-Ÿ]/.test(nome)) {
-                    alert('Nome do item deve conter letras');
-                    mostrarFeedbackInvalido(nomeInput, 'Nome deve conter letras');
+                if (!/[A-ZÀ-Ÿ0-9]/.test(nome)) {
+                    alert('Nome do item deve conter letras ou números');
+                    mostrarFeedbackInvalido(nomeInput, 'Nome deve conter letras ou números');
                     temErro = true;
                     return;
                 }
@@ -3624,9 +3627,9 @@
                 input.focus();
                 return;
             }
-            if (!/[A-ZÀ-Ÿ]/.test(valor) && tipo !== 'unidade') {
-                alert('O valor deve conter letras');
-                mostrarFeedbackInvalido(input, 'Deve conter letras');
+            if (!/[A-ZÀ-Ÿ0-9]/.test(valor) && tipo !== 'unidade') {
+                alert('O valor deve conter letras ou números');
+                mostrarFeedbackInvalido(input, 'Deve conter letras ou números');
                 input.focus();
                 return;
             }

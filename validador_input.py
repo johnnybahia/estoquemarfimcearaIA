@@ -20,7 +20,7 @@ def detectar_gibberish(texto):
     - ",,,,,,,,,,,,"
     - "!!!!!!"
     - "asdfghjkl"
-    - "123456789" (quando esperado texto)
+    - "aaa bbb" (caracteres repetidos sem sentido)
     - "     " (só espaços)
     - "aaa bbb ccc" (caracteres repetidos)
     """
@@ -49,12 +49,16 @@ def detectar_gibberish(texto):
         if contagem > len(texto_limpo) * 0.6 and len(texto_limpo) > 3:
             return True, f"Caractere '{char}' repetido excessivamente"
 
+    # Se o texto é puramente numérico (código de produto), aceitar
+    if re.match(r'^[\d\s./-]+$', texto_limpo):
+        return False, "OK"
+
     # Padrão de teclado (sequências comuns de mash de teclado)
     padroes_teclado = [
         'asdf', 'qwer', 'zxcv', 'hjkl', 'uiop',
         'asdfjkl', 'qwertyuiop', 'zxcvbnm',
         'aaaa', 'bbbb', 'cccc', 'dddd',
-        'abcdef', '12345', '09876',
+        'abcdef',
     ]
     texto_lower = texto_limpo.lower().replace(' ', '')
     for padrao in padroes_teclado:
@@ -205,10 +209,6 @@ def validar_nome_item(nome):
     # Máximo 100 caracteres
     if len(nome_norm) > 100:
         return False, nome_norm, "Nome do item muito longo (máximo 100 caracteres)"
-
-    # Deve conter pelo menos uma letra
-    if not re.search(r'[A-ZÀ-Ÿ]', nome_norm):
-        return False, nome_norm, "Nome do item deve conter letras"
 
     return True, nome_norm, "OK"
 
