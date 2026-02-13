@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 Histórico de Movimentações - Marfim</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; min-height: 100vh; }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 36px; margin-bottom: 10px; }
+        .header p { font-size: 16px; opacity: 0.9; }
+
+        .card { background: white; border-radius: 16px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); margin-bottom: 20px; }
+
+        /* Filtros */
+        .filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .filtro-item { display: flex; flex-direction: column; }
+        .filtro-item label { font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 500; text-transform: uppercase; }
+        .filtro-item input, .filtro-item select { padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: border 0.3s; }
+        .filtro-item input:focus, .filtro-item select:focus { outline: none; border-color: #667eea; }
+
+        .filtros-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; transform: translateY(-2px); }
+        .btn-secondary { background: #f0f0f0; color: #555; }
+        .btn-secondary:hover { background: #e0e0e0; }
+
+        /* Estatísticas */
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; color: white; text-align: center; }
+        .stat-box .value { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
+        .stat-box .label { font-size: 12px; opacity: 0.9; text-transform: uppercase; }
+
+        /* Tabela */
+        .table-container { overflow-x: auto; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead { background: #f8f9fa; }
+        th { padding: 15px; text-align: left; font-size: 12px; text-transform: uppercase; color: #666; font-weight: 600; border-bottom: 2px solid #e0e0e0; }
+        td { padding: 15px; border-bottom: 1px solid #f0f0f0; }
+
+        tr:hover { background: #f8f9fa; }
+
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 500; text-transform: uppercase; }
+        .badge.entrada { background: #E8F5E9; color: #4CAF50; }
+        .badge.saida { background: #FFEBEE; color: #F44336; }
+
+        .item-nome { font-weight: 500; color: #333; }
+        .grupo-nome { color: #667eea; font-size: 12px; }
+
+        .saldo-box { display: flex; align-items: center; gap: 5px; font-size: 13px; }
+        .saldo-anterior { color: #999; }
+        .saldo-arrow { color: #ccc; }
+        .saldo-novo { font-weight: 600; color: #333; }
+        .saldo-novo.positivo { color: #4CAF50; }
+        .saldo-novo.negativo { color: #F44336; }
+
+        /* Paginação */
+        .paginacao { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px; }
+        .paginacao button { padding: 8px 16px; border: 2px solid #e0e0e0; background: white; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+        .paginacao button:hover:not(:disabled) { border-color: #667eea; background: #f8f9ff; }
+        .paginacao button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .paginacao .pagina-atual { padding: 8px 16px; font-weight: 600; color: #667eea; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 40px; color: #999; }
+        .spinner { display: inline-block; width: 40px; height: 40px; border: 4px solid #f0f0f0; border-top: 4px solid #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .empty-state .icon { font-size: 64px; margin-bottom: 20px; opacity: 0.5; }
+        .empty-state h3 { font-size: 20px; margin-bottom: 10px; }
+        .empty-state p { font-size: 14px; }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .filtros { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            table { font-size: 12px; }
+            th, td { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Histórico de Movimentações</h1>
+            <p>Últimas movimentações em cache - Carregamento instantâneo</p>
+        </div>
+
+        <!-- Estatísticas -->
+        <div class="card">
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="value" id="statTotal">0</div>
+                    <div class="label">Total de Registros</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="statHoje">0</div>
+                    <div class="label">Hoje</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="statCache">0</div>
+                    <div class="label">Em Cache</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="statHitRate">0%</div>
+                    <div class="label">Hit Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="card">
+            <h3 style="margin-bottom: 20px;">🔍 Filtros</h3>
+            <div class="filtros">
+                <div class="filtro-item">
+                    <label>Item</label>
+                    <input type="text" id="filtroItem" placeholder="Ex: AMARELO">
+                </div>
+                <div class="filtro-item">
+                    <label>Grupo</label>
+                    <input type="text" id="filtroGrupo" placeholder="Ex: FIOS">
+                </div>
+                <div class="filtro-item">
+                    <label>Tipo</label>
+                    <select id="filtroTipo">
+                        <option value="">Todos</option>
+                        <option value="ENTRADA">➕ ENTRADA</option>
+                        <option value="SAIDA">➖ SAÍDA</option>
+                    </select>
+                </div>
+                <div class="filtro-item">
+                    <label>Data Início</label>
+                    <input type="date" id="filtroDataInicio">
+                </div>
+                <div class="filtro-item">
+                    <label>Data Fim</label>
+                    <input type="date" id="filtroDataFim">
+                </div>
+            </div>
+            <div class="filtros-actions">
+                <button class="btn btn-primary" onclick="aplicarFiltros()">🔍 Buscar</button>
+                <button class="btn btn-secondary" onclick="limparFiltros()">🗑️ Limpar</button>
+                <button class="btn btn-secondary" onclick="carregarHoje()">📆 Hoje</button>
+                <button class="btn btn-secondary" onclick="atualizarStats()">🔄 Atualizar Stats</button>
+            </div>
+        </div>
+
+        <!-- Tabela -->
+        <div class="card">
+            <div id="loadingContainer" class="loading" style="display:none;">
+                <div class="spinner"></div>
+                <p style="margin-top: 15px;">Carregando histórico...</p>
+            </div>
+
+            <div id="tableContainer" style="display:none;">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Item</th>
+                                <th>Tipo</th>
+                                <th>Quantidade</th>
+                                <th>Saldo</th>
+                                <th>Usuário</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginação -->
+                <div class="paginacao">
+                    <button onclick="paginaAnterior()" id="btnAnterior">← Anterior</button>
+                    <span class="pagina-atual">
+                        Página <span id="paginaAtual">1</span> de <span id="totalPaginas">1</span>
+                    </span>
+                    <button onclick="proximaPagina()" id="btnProxima">Próxima →</button>
+                </div>
+            </div>
+
+            <div id="emptyContainer" class="empty-state" style="display:none;">
+                <div class="icon">📭</div>
+                <h3>Nenhum registro encontrado</h3>
+                <p>Tente ajustar os filtros ou adicione novas movimentações</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        let paginaAtualGlobal = 1;
+        let totalPaginasGlobal = 1;
+
+        // Carrega ao iniciar
+        window.addEventListener('load', () => {
+            carregarHistorico();
+            atualizarStats();
+        });
+
+        async function carregarHistorico(pagina = 1) {
+            mostrarLoading();
+
+            try {
+                // Monta URL com filtros
+                const params = new URLSearchParams({
+                    pagina: pagina,
+                    por_pagina: 20
+                });
+
+                // Adiciona filtros se preenchidos
+                const filtroItem = document.getElementById('filtroItem').value;
+                const filtroGrupo = document.getElementById('filtroGrupo').value;
+                const filtroTipo = document.getElementById('filtroTipo').value;
+                const filtroDataInicio = document.getElementById('filtroDataInicio').value;
+                const filtroDataFim = document.getElementById('filtroDataFim').value;
+
+                if (filtroItem) params.append('item', filtroItem);
+                if (filtroGrupo) params.append('grupo', filtroGrupo);
+                if (filtroTipo) params.append('tipo', filtroTipo);
+
+                if (filtroDataInicio && filtroDataFim) {
+                    params.append('data_inicio', converterDataParaBR(filtroDataInicio));
+                    params.append('data_fim', converterDataParaBR(filtroDataFim));
+                }
+
+                const response = await fetch(`${API_BASE}/historico/paginado?${params}`);
+                const data = await response.json();
+
+                renderizarTabela(data);
+
+            } catch (error) {
+                console.error('Erro ao carregar histórico:', error);
+                mostrarEmpty();
+            }
+        }
+
+        function renderizarTabela(data) {
+            if (!data.registros || data.registros.length === 0) {
+                mostrarEmpty();
+                return;
+            }
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            data.registros.forEach(registro => {
+                const tr = document.createElement('tr');
+
+                // Tipo badge
+                const tipoBadge = registro.tipo_movimentacao.toUpperCase().includes('ENTRADA')
+                    ? '<span class="badge entrada">➕ ENTRADA</span>'
+                    : '<span class="badge saida">➖ SAÍDA</span>';
+
+                // Saldo (antes → depois)
+                const saldoClass = registro.saldo_novo > registro.saldo_anterior ? 'positivo' :
+                                  registro.saldo_novo < 0 ? 'negativo' : '';
+
+                tr.innerHTML = `
+                    <td>
+                        <div style="font-size: 13px; font-weight: 500;">${registro.data}</div>
+                        <div style="font-size: 11px; color: #999;">${registro.hora}</div>
+                    </td>
+                    <td>
+                        <div class="item-nome">${registro.item}</div>
+                        ${registro.grupo ? `<div class="grupo-nome">${registro.grupo}</div>` : ''}
+                    </td>
+                    <td>${tipoBadge}</td>
+                    <td style="text-align: right; font-weight: 500;">${registro.quantidade.toFixed(2)}</td>
+                    <td>
+                        <div class="saldo-box">
+                            <span class="saldo-anterior">${registro.saldo_anterior.toFixed(2)}</span>
+                            <span class="saldo-arrow">→</span>
+                            <span class="saldo-novo ${saldoClass}">${registro.saldo_novo.toFixed(2)}</span>
+                        </div>
+                    </td>
+                    <td style="font-size: 12px; color: #666;">${registro.usuario || '-'}</td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+
+            // Atualiza paginação
+            paginaAtualGlobal = data.pagina;
+            totalPaginasGlobal = data.total_paginas;
+
+            document.getElementById('paginaAtual').textContent = data.pagina;
+            document.getElementById('totalPaginas').textContent = data.total_paginas;
+
+            document.getElementById('btnAnterior').disabled = !data.tem_anterior;
+            document.getElementById('btnProxima').disabled = !data.tem_proxima;
+
+            // Atualiza stat de total
+            document.getElementById('statTotal').textContent = data.total;
+
+            mostrarTabela();
+        }
+
+        async function atualizarStats() {
+            try {
+                const response = await fetch(`${API_BASE}/historico/estatisticas`);
+                const stats = await response.json();
+
+                document.getElementById('statCache').textContent = stats.tamanho_cache;
+                document.getElementById('statHitRate').textContent = stats.hit_rate;
+
+                // Carrega hoje
+                const respostaHoje = await fetch(`${API_BASE}/historico/hoje`);
+                const dataHoje = await respostaHoje.json();
+                document.getElementById('statHoje').textContent = dataHoje.total;
+
+            } catch (error) {
+                console.error('Erro ao atualizar stats:', error);
+            }
+        }
+
+        function aplicarFiltros() {
+            carregarHistorico(1);
+        }
+
+        function limparFiltros() {
+            document.getElementById('filtroItem').value = '';
+            document.getElementById('filtroGrupo').value = '';
+            document.getElementById('filtroTipo').value = '';
+            document.getElementById('filtroDataInicio').value = '';
+            document.getElementById('filtroDataFim').value = '';
+            carregarHistorico(1);
+        }
+
+        async function carregarHoje() {
+            mostrarLoading();
+
+            try {
+                const response = await fetch(`${API_BASE}/historico/hoje`);
+                const data = await response.json();
+
+                // Simula resposta paginada
+                renderizarTabela({
+                    registros: data.registros,
+                    total: data.total,
+                    pagina: 1,
+                    total_paginas: 1,
+                    tem_proxima: false,
+                    tem_anterior: false
+                });
+
+            } catch (error) {
+                console.error('Erro ao carregar hoje:', error);
+                mostrarEmpty();
+            }
+        }
+
+        function paginaAnterior() {
+            if (paginaAtualGlobal > 1) {
+                carregarHistorico(paginaAtualGlobal - 1);
+            }
+        }
+
+        function proximaPagina() {
+            if (paginaAtualGlobal < totalPaginasGlobal) {
+                carregarHistorico(paginaAtualGlobal + 1);
+            }
+        }
+
+        function mostrarLoading() {
+            document.getElementById('loadingContainer').style.display = 'block';
+            document.getElementById('tableContainer').style.display = 'none';
+            document.getElementById('emptyContainer').style.display = 'none';
+        }
+
+        function mostrarTabela() {
+            document.getElementById('loadingContainer').style.display = 'none';
+            document.getElementById('tableContainer').style.display = 'block';
+            document.getElementById('emptyContainer').style.display = 'none';
+        }
+
+        function mostrarEmpty() {
+            document.getElementById('loadingContainer').style.display = 'none';
+            document.getElementById('tableContainer').style.display = 'none';
+            document.getElementById('emptyContainer').style.display = 'block';
+        }
+
+        function converterDataParaBR(dataISO) {
+            // Converte YYYY-MM-DD para DD/MM/YYYY
+            const [ano, mes, dia] = dataISO.split('-');
+            return `${dia}/${mes}/${ano}`;
+        }
+
+        // Auto-busca ao digitar (debounce)
+        let timeoutBusca;
+        ['filtroItem', 'filtroGrupo'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                clearTimeout(timeoutBusca);
+                timeoutBusca = setTimeout(() => aplicarFiltros(), 500);
+            });
+        });
+    </script>
+</body>
+</html>
