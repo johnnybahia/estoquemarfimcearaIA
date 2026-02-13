@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 Alertas - Marfim Estoque</title>
+
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        /* Dashboard Cards */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .dashboard-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .dashboard-card.critico {
+            border-left: 5px solid #F44336;
+        }
+
+        .dashboard-card.atencao {
+            border-left: 5px solid #FFC107;
+        }
+
+        .dashboard-card.normal {
+            border-left: 5px solid #4CAF50;
+        }
+
+        .dashboard-card.info {
+            border-left: 5px solid #2196F3;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .card-icon {
+            font-size: 48px;
+        }
+
+        .card-number {
+            font-size: 42px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .card-title {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }
+
+        .card-subtitle {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        /* Alertas List */
+        .alertas-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .section-title {
+            font-size: 24px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            background: #f0f0f0;
+            color: #666;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .filter-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .alertas-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .alertas-table thead {
+            background: #f5f5f5;
+        }
+
+        .alertas-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 500;
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .alertas-table td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .alertas-table tbody tr {
+            transition: background 0.2s;
+        }
+
+        .alertas-table tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: white;
+        }
+
+        .badge.critico { background: #F44336; }
+        .badge.atencao { background: #FFC107; color: #333; }
+        .badge.normal { background: #4CAF50; }
+        .badge.info { background: #2196F3; }
+
+        .item-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .grupo-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #666;
+            margin-left: 8px;
+        }
+
+        .dias-parado {
+            font-weight: 500;
+        }
+
+        .sugestao-tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .sugestao-tooltip:hover::after {
+            content: attr(data-sugestao);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 1000;
+            max-width: 300px;
+            white-space: normal;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Refresh Button */
+        .refresh-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.3s;
+        }
+
+        .refresh-btn:hover {
+            background: #5568d3;
+        }
+
+        .refresh-btn .material-icons {
+            font-size: 18px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state .material-icons {
+            font-size: 64px;
+            color: #ddd;
+            margin-bottom: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .alertas-table {
+                font-size: 12px;
+            }
+
+            .alertas-table th,
+            .alertas-table td {
+                padding: 10px 5px;
+            }
+
+            .filter-buttons {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🚨 Sistema de Alertas Inteligente</h1>
+            <p>Monitoramento automático de estoque com classificação por cores</p>
+        </div>
+
+        <!-- Dashboard Cards -->
+        <div class="dashboard-grid" id="dashboardCards">
+            <!-- Cards serão inseridos via JavaScript -->
+        </div>
+
+        <!-- Alertas List -->
+        <div class="alertas-section">
+            <div class="section-header">
+                <h2 class="section-title">📋 Todos os Alertas</h2>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <div class="filter-buttons" id="filterButtons">
+                        <button class="filter-btn active" data-filter="todos">Todos</button>
+                        <button class="filter-btn" data-filter="critico">🔴 Críticos</button>
+                        <button class="filter-btn" data-filter="atencao">🟡 Atenção</button>
+                        <button class="filter-btn" data-filter="normal">🟢 Normal</button>
+                    </div>
+                    <button class="refresh-btn" onclick="carregarDados(true)">
+                        <span class="material-icons">refresh</span>
+                        Atualizar
+                    </button>
+                </div>
+            </div>
+
+            <div id="alertasContent">
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Carregando alertas...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração da API
+        const API_BASE = 'http://localhost:5000/api';
+
+        // Estado global
+        let todosAlertas = [];
+        let filtroAtual = 'todos';
+
+        // Carrega dados ao iniciar
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarDados();
+            configurarFiltros();
+        });
+
+        // Configura botões de filtro
+        function configurarFiltros() {
+            const botoes = document.querySelectorAll('.filter-btn');
+            botoes.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Remove active de todos
+                    botoes.forEach(b => b.classList.remove('active'));
+                    // Adiciona active no clicado
+                    btn.classList.add('active');
+                    // Aplica filtro
+                    filtroAtual = btn.dataset.filter;
+                    aplicarFiltro();
+                });
+            });
+        }
+
+        // Carrega dados da API
+        async function carregarDados(forcarRecarga = false) {
+            try {
+                // Carrega dashboard
+                const dashboardResponse = await fetch(`${API_BASE}/alertas/dashboard`);
+                const dashboardData = await dashboardResponse.json();
+                renderizarDashboard(dashboardData);
+
+                // Carrega todos os alertas
+                const alertasUrl = `${API_BASE}/alertas/todos${forcarRecarga ? '?forcar_recarga=true' : ''}`;
+                const alertasResponse = await fetch(alertasUrl);
+                const alertasData = await alertasResponse.json();
+
+                todosAlertas = alertasData.alertas;
+                aplicarFiltro();
+
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+                document.getElementById('alertasContent').innerHTML = `
+                    <div class="empty-state">
+                        <span class="material-icons">error_outline</span>
+                        <h3>Erro ao carregar alertas</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Renderiza cards do dashboard
+        function renderizarDashboard(data) {
+            const container = document.getElementById('dashboardCards');
+            const contadores = data.contadores;
+            const stats = data.estatisticas;
+
+            container.innerHTML = `
+                <div class="dashboard-card critico">
+                    <div class="card-header">
+                        <div class="card-icon">🔴</div>
+                        <div class="card-number">${contadores.critico}</div>
+                    </div>
+                    <div class="card-title">Críticos</div>
+                    <div class="card-subtitle">${stats.porcentagem_critico}% do total</div>
+                </div>
+
+                <div class="dashboard-card atencao">
+                    <div class="card-header">
+                        <div class="card-icon">🟡</div>
+                        <div class="card-number">${contadores.atencao}</div>
+                    </div>
+                    <div class="card-title">Atenção</div>
+                    <div class="card-subtitle">${stats.porcentagem_atencao}% do total</div>
+                </div>
+
+                <div class="dashboard-card normal">
+                    <div class="card-header">
+                        <div class="card-icon">🟢</div>
+                        <div class="card-number">${contadores.normal}</div>
+                    </div>
+                    <div class="card-title">Normal</div>
+                    <div class="card-subtitle">Movimentação regular</div>
+                </div>
+
+                <div class="dashboard-card info">
+                    <div class="card-header">
+                        <div class="card-icon">📊</div>
+                        <div class="card-number">${stats.total_itens}</div>
+                    </div>
+                    <div class="card-title">Total de Itens</div>
+                    <div class="card-subtitle">Média: ${stats.media_dias_parado} dias</div>
+                </div>
+            `;
+        }
+
+        // Aplica filtro aos alertas
+        function aplicarFiltro() {
+            let alertasFiltrados = todosAlertas;
+
+            if (filtroAtual !== 'todos') {
+                alertasFiltrados = todosAlertas.filter(a => a.tipo === filtroAtual);
+            }
+
+            renderizarAlertas(alertasFiltrados);
+        }
+
+        // Renderiza tabela de alertas
+        function renderizarAlertas(alertas) {
+            const container = document.getElementById('alertasContent');
+
+            if (alertas.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <span class="material-icons">check_circle_outline</span>
+                        <h3>Nenhum alerta encontrado</h3>
+                        <p>Tudo está funcionando normalmente!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = `
+                <table class="alertas-table">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Item</th>
+                            <th>Grupo</th>
+                            <th>Dias Parado</th>
+                            <th>Saldo</th>
+                            <th>Última Data</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${alertas.map(a => `
+                            <tr>
+                                <td>
+                                    <span class="badge ${a.tipo}">${a.icone} ${a.tipo.toUpperCase()}</span>
+                                </td>
+                                <td>
+                                    <span class="item-name">${a.item}</span>
+                                </td>
+                                <td>
+                                    ${a.grupo ? `<span class="grupo-tag">${a.grupo}</span>` : '-'}
+                                </td>
+                                <td>
+                                    <span class="dias-parado" style="color: ${a.dias_parado > 20 ? '#F44336' : '#666'}">
+                                        ${a.dias_parado} dias
+                                    </span>
+                                </td>
+                                <td>${a.saldo_atual}</td>
+                                <td>${a.ultima_data}</td>
+                                <td>
+                                    <span class="sugestao-tooltip" data-sugestao="${a.sugestao}">
+                                        <span class="material-icons" style="font-size: 18px; color: #999;">info</span>
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // Auto-refresh a cada 5 minutos
+        setInterval(() => {
+            carregarDados();
+        }, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
