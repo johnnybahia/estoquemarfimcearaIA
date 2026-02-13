@@ -21,6 +21,9 @@ streamlit>=1.28.0
 # Visualization
 plotly>=5.18.0
 
+# Cache & Performance
+redis>=5.0.0
+
 # Utilities
 python-dateutil>=2.8.0
 requests>=2.31.0
