@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 IA Avançada - Marfim</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; min-height: 100vh; }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 36px; margin-bottom: 10px; }
+        .header .subtitle { font-size: 16px; opacity: 0.9; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px; }
+
+        .card { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+
+        .card-title { font-size: 18px; font-weight: 600; margin-bottom: 15px; color: #333; display: flex; align-items: center; gap: 10px; }
+        .card-title .icon { font-size: 24px; }
+
+        /* Validador */
+        .validador-form { display: flex; flex-direction: column; gap: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select { padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #667eea; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s; width: 100%; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; transform: translateY(-2px); }
+
+        /* Resultado de validação */
+        .validacao-resultado { margin-top: 20px; padding: 15px; border-radius: 12px; }
+        .validacao-resultado.valido { background: #E8F5E9; border: 2px solid #4CAF50; }
+        .validacao-resultado.invalido { background: #FFEBEE; border: 2px solid #F44336; }
+
+        .validacao-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+        .validacao-status { font-size: 18px; font-weight: 600; }
+        .validacao-status.valido { color: #4CAF50; }
+        .validacao-status.invalido { color: #F44336; }
+
+        .score-badge { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; background: white; border-radius: 20px; font-size: 14px; font-weight: 600; }
+
+        .confianca-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin: 10px 0; }
+        .confianca-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.5s; }
+
+        .mensagens-lista { margin-top: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .mensagem-item { padding: 10px; border-radius: 8px; font-size: 13px; line-height: 1.5; }
+        .mensagem-item.problema { background: #FFEBEE; color: #C62828; }
+        .mensagem-item.aviso { background: #FFF3E0; color: #E65100; }
+        .mensagem-item.sugestao { background: #E3F2FD; color: #1565C0; }
+
+        /* Predição */
+        .predicao-box { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 12px; text-align: center; }
+        .predicao-saldo { font-size: 48px; font-weight: bold; margin: 15px 0; }
+        .predicao-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .predicao-stat { background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; }
+        .predicao-stat-label { font-size: 11px; opacity: 0.9; text-transform: uppercase; }
+        .predicao-stat-value { font-size: 20px; font-weight: bold; margin-top: 5px; }
+
+        .tendencia-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; margin-top: 10px; }
+        .tendencia-badge.crescente { background: #FFEBEE; color: #F44336; }
+        .tendencia-badge.decrescente { background: #FFF3E0; color: #F57C00; }
+        .tendencia-badge.estavel { background: #E8F5E9; color: #4CAF50; }
+
+        /* Recomendações */
+        .recomendacoes-lista { display: flex; flex-direction: column; gap: 12px; }
+        .recomendacao-item { background: #f8f9fa; padding: 15px; border-radius: 12px; border-left: 4px solid #667eea; }
+        .recomendacao-item.prioridade-5 { border-color: #F44336; }
+        .recomendacao-item.prioridade-4 { border-color: #FF9800; }
+        .recomendacao-item.prioridade-3 { border-color: #FFC107; }
+
+        .recomendacao-titulo { font-weight: 600; margin-bottom: 5px; color: #333; }
+        .recomendacao-desc { font-size: 13px; color: #666; margin-bottom: 10px; }
+        .recomendacao-acao { font-size: 12px; color: #667eea; font-weight: 500; }
+
+        .prioridade-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; color: white; }
+        .prioridade-badge.p5 { background: #F44336; }
+        .prioridade-badge.p4 { background: #FF9800; }
+        .prioridade-badge.p3 { background: #FFC107; color: #333; }
+
+        /* Anomalias */
+        .anomalias-lista { display: flex; flex-direction: column; gap: 10px; }
+        .anomalia-item { padding: 12px; border-radius: 8px; border: 2px solid; }
+        .anomalia-item.alta { background: #FFEBEE; border-color: #F44336; }
+        .anomalia-item.media { background: #FFF3E0; border-color: #FF9800; }
+        .anomalia-item.baixa { background: #FFF9C4; border-color: #FBC02D; }
+
+        .anomalia-tipo { font-size: 11px; text-transform: uppercase; font-weight: 600; color: #999; }
+        .anomalia-desc { font-size: 14px; margin: 5px 0; color: #333; }
+        .anomalia-rec { font-size: 12px; color: #666; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 20px; color: #999; }
+        .spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid #f0f0f0; border-top: 3px solid #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .empty { text-align: center; padding: 40px; color: #999; }
+        .empty .icon { font-size: 48px; margin-bottom: 15px; opacity: 0.5; }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 IA Avançada</h1>
+            <p class="subtitle">Validação inteligente, predição de saldos e recomendações automáticas</p>
+        </div>
+
+        <div class="grid">
+            <!-- Validador IA -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">🤖</span>
+                    Validador Inteligente
+                </div>
+
+                <form class="validador-form" id="formValidador">
+                    <div class="form-group">
+                        <label>Item</label>
+                        <input type="text" id="validItem" placeholder="Ex: AMARELO 1234" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="validTipo" required>
+                            <option value="ENTRADA">➕ ENTRADA</option>
+                            <option value="SAIDA">➖ SAÍDA</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantidade</label>
+                        <input type="number" id="validQuant" placeholder="100" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Saldo Atual</label>
+                        <input type="number" id="validSaldo" placeholder="250" step="0.01" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">🔍 Validar com IA</button>
+                </form>
+
+                <div id="resultadoValidacao" style="display:none;"></div>
+            </div>
+
+            <!-- Preditor de Saldo -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">🔮</span>
+                    Predição de Saldo
+                </div>
+
+                <form class="validador-form" id="formPredicao">
+                    <div class="form-group">
+                        <label>Item</label>
+                        <input type="text" id="predItem" placeholder="Ex: AMARELO 1234" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Dias no futuro</label>
+                        <input type="number" id="predDias" value="7" min="1" max="30" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">🔮 Prever Saldo</button>
+                </form>
+
+                <div id="resultadoPredicao" style="display:none;"></div>
+            </div>
+
+            <!-- Detector de Anomalias -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">🔍</span>
+                    Detector de Anomalias
+                </div>
+
+                <form class="validador-form" id="formAnomalias">
+                    <div class="form-group">
+                        <label>Item</label>
+                        <input type="text" id="anomItem" placeholder="Ex: AMARELO 1234" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantidade</label>
+                        <input type="number" id="anomQuant" placeholder="1000" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="anomTipo" required>
+                            <option value="SAIDA">SAÍDA</option>
+                            <option value="ENTRADA">ENTRADA</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">🔍 Detectar Anomalias</button>
+                </form>
+
+                <div id="resultadoAnomalias" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- Recomendações IA -->
+        <div class="card">
+            <div class="card-title">
+                <span class="icon">💡</span>
+                Recomendações da IA
+                <button class="btn btn-primary" onclick="carregarRecomendacoes()" style="margin-left: auto; width: auto; padding: 8px 16px;">
+                    🔄 Atualizar
+                </button>
+            </div>
+
+            <div id="loadingRecomendacoes" class="loading" style="display:none;">
+                <div class="spinner"></div>
+                <p>Gerando recomendações...</p>
+            </div>
+
+            <div id="recomendacoesContainer" class="recomendacoes-lista"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        // Validador IA
+        document.getElementById('formValidador').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const item = document.getElementById('validItem').value;
+            const tipo = document.getElementById('validTipo').value;
+            const quantidade = parseFloat(document.getElementById('validQuant').value);
+            const saldo = parseFloat(document.getElementById('validSaldo').value);
+
+            await validarComIA(item, tipo, quantidade, saldo);
+        });
+
+        async function validarComIA(item, tipo, quantidade, saldo) {
+            const container = document.getElementById('resultadoValidacao');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            container.style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_BASE}/ia/validar`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        item, tipo_movimentacao: tipo, quantidade, saldo_atual: saldo
+                    })
+                });
+
+                const {validacao} = await response.json();
+
+                renderizarValidacao(validacao);
+
+            } catch (error) {
+                container.innerHTML = '<div class="empty">❌ Erro ao validar</div>';
+            }
+        }
+
+        function renderizarValidacao(v) {
+            const container = document.getElementById('resultadoValidacao');
+
+            const classe = v.valido ? 'valido' : 'invalido';
+            const statusTexto = v.valido ? '✅ VÁLIDO' : '❌ INVÁLIDO';
+            const statusClasse = v.valido ? 'valido' : 'invalido';
+
+            let mensagensHtml = '';
+
+            if (v.problemas && v.problemas.length > 0) {
+                mensagensHtml += v.problemas.map(p =>
+                    `<div class="mensagem-item problema">${p}</div>`
+                ).join('');
+            }
+
+            if (v.avisos && v.avisos.length > 0) {
+                mensagensHtml += v.avisos.map(a =>
+                    `<div class="mensagem-item aviso">${a}</div>`
+                ).join('');
+            }
+
+            if (v.sugestoes && v.sugestoes.length > 0) {
+                mensagensHtml += v.sugestoes.map(s =>
+                    `<div class="mensagem-item sugestao">${s}</div>`
+                ).join('');
+            }
+
+            container.innerHTML = `
+                <div class="validacao-resultado ${classe}">
+                    <div class="validacao-header">
+                        <span class="validacao-status ${statusClasse}">${statusTexto}</span>
+                        <span class="score-badge">
+                            Score: ${v.score.toFixed(0)}/100
+                        </span>
+                    </div>
+                    <div>
+                        <small style="color: #666;">Confiança: ${v.confianca.toFixed(0)}% (${v.nivel_confianca})</small>
+                        <div class="confianca-bar">
+                            <div class="confianca-fill" style="width: ${v.confianca}%"></div>
+                        </div>
+                    </div>
+                    ${mensagensHtml ? `<div class="mensagens-lista">${mensagensHtml}</div>` : ''}
+                </div>
+            `;
+
+            container.style.display = 'block';
+        }
+
+        // Preditor
+        document.getElementById('formPredicao').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const item = document.getElementById('predItem').value;
+            const dias = parseInt(document.getElementById('predDias').value);
+
+            await preverSaldo(item, dias);
+        });
+
+        async function preverSaldo(item, dias) {
+            const container = document.getElementById('resultadoPredicao');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            container.style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_BASE}/ia/prever-saldo`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({item, dias})
+                });
+
+                const {predicao} = await response.json();
+
+                renderizarPredicao(predicao);
+
+            } catch (error) {
+                container.innerHTML = '<div class="empty">❌ Erro ao prever</div>';
+            }
+        }
+
+        function renderizarPredicao(p) {
+            const container = document.getElementById('resultadoPredicao');
+
+            const tendenciaClasse = p.tendencia === 'crescente' ? 'crescente' :
+                                   p.tendencia === 'decrescente' ? 'decrescente' : 'estavel';
+
+            const tendenciaIcone = p.tendencia === 'crescente' ? '📈' :
+                                  p.tendencia === 'decrescente' ? '📉' : '➡️';
+
+            container.innerHTML = `
+                <div class="predicao-box">
+                    <div style="font-size: 14px; opacity: 0.9;">Saldo previsto em ${p.dias_para_zerar ? `(${p.dias_para_zerar} dias)` : 'breve'}</div>
+                    <div class="predicao-saldo">${p.saldo_previsto.toFixed(1)}</div>
+                    <div class="tendencia-badge ${tendenciaClasse}">
+                        ${tendenciaIcone} ${p.tendencia.toUpperCase()}
+                    </div>
+                    <div class="predicao-info">
+                        <div class="predicao-stat">
+                            <div class="predicao-stat-label">Saldo Atual</div>
+                            <div class="predicao-stat-value">${p.saldo_atual.toFixed(1)}</div>
+                        </div>
+                        <div class="predicao-stat">
+                            <div class="predicao-stat-label">Média Diária</div>
+                            <div class="predicao-stat-value">${p.media_diaria.toFixed(1)}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.3); font-size: 13px;">
+                        ${p.recomendacao}
+                    </div>
+                    <div style="margin-top: 10px; font-size: 11px; opacity: 0.8;">
+                        Confiança: ${p.confianca.toFixed(0)}%
+                    </div>
+                </div>
+            `;
+
+            container.style.display = 'block';
+        }
+
+        // Detector de Anomalias
+        document.getElementById('formAnomalias').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const item = document.getElementById('anomItem').value;
+            const quantidade = parseFloat(document.getElementById('anomQuant').value);
+            const tipo = document.getElementById('anomTipo').value;
+
+            await detectarAnomalias(item, quantidade, tipo);
+        });
+
+        async function detectarAnomalias(item, quantidade, tipo) {
+            const container = document.getElementById('resultadoAnomalias');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            container.style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_BASE}/ia/detectar-anomalias`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({item, quantidade, tipo_movimentacao: tipo})
+                });
+
+                const {anomalias, total} = await response.json();
+
+                renderizarAnomalias(anomalias, total);
+
+            } catch (error) {
+                container.innerHTML = '<div class="empty">❌ Erro ao detectar</div>';
+            }
+        }
+
+        function renderizarAnomalias(anomalias, total) {
+            const container = document.getElementById('resultadoAnomalias');
+
+            if (total === 0) {
+                container.innerHTML = '<div class="empty"><div class="icon">✅</div><p>Nenhuma anomalia detectada!</p></div>';
+                container.style.display = 'block';
+                return;
+            }
+
+            const html = `
+                <div class="anomalias-lista">
+                    ${anomalias.map(a => `
+                        <div class="anomalia-item ${a.gravidade}">
+                            <div class="anomalia-tipo">${a.tipo.replace('_', ' ')}</div>
+                            <div class="anomalia-desc">${a.descricao}</div>
+                            <div class="anomalia-rec">💡 ${a.recomendacao}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            container.innerHTML = html;
+            container.style.display = 'block';
+        }
+
+        // Recomendações
+        async function carregarRecomendacoes() {
+            document.getElementById('loadingRecomendacoes').style.display = 'block';
+            document.getElementById('recomendacoesContainer').innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_BASE}/ia/recomendacoes?limite=5`);
+                const {recomendacoes, total} = await response.json();
+
+                document.getElementById('loadingRecomendacoes').style.display = 'none';
+
+                if (total === 0) {
+                    document.getElementById('recomendacoesContainer').innerHTML =
+                        '<div class="empty"><div class="icon">✅</div><p>Nenhuma recomendação no momento!</p></div>';
+                    return;
+                }
+
+                const html = recomendacoes.map(r => `
+                    <div class="recomendacao-item prioridade-${r.prioridade}">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <span class="prioridade-badge p${r.prioridade}">P${r.prioridade}</span>
+                            <div class="recomendacao-titulo">${r.titulo}</div>
+                        </div>
+                        <div class="recomendacao-desc">${r.descricao}</div>
+                        <div class="recomendacao-acao">👉 ${r.acao_sugerida}</div>
+                    </div>
+                `).join('');
+
+                document.getElementById('recomendacoesContainer').innerHTML = html;
+
+            } catch (error) {
+                document.getElementById('loadingRecomendacoes').style.display = 'none';
+                document.getElementById('recomendacoesContainer').innerHTML =
+                    '<div class="empty">❌ Erro ao carregar recomendações</div>';
+            }
+        }
+
+        // Carrega ao iniciar
+        window.addEventListener('load', () => {
+            carregarRecomendacoes();
+        });
+    </script>
+</body>
+</html>
