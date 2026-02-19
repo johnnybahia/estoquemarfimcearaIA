@@ -1,29 +1,39 @@
-# Marfim IA - Sistema Inteligente de Estoque
-# Dependências do projeto
+# =====================================================
+# MARFIM ESTOQUE CEARÁ — Dependências Completas
+# Atualizado: 2026-02-13 (FASE 8 — Integração Final)
+# =====================================================
+# Instalação: pip install -r requirements.txt
+# =====================================================
 
-# Google Sheets
-gspread>=5.10.0
-oauth2client>=4.1.3
-google-auth>=2.23.0
-
-# Data Processing
-pandas>=2.0.0
-numpy>=1.24.0
-openpyxl>=3.1.0
-
-# AI/ML
-groq>=0.4.0
-
-# Web Frameworks
-flask>=2.3.0
+# CORE — Servidor e API
+flask>=3.0.0
+flask-cors>=4.0.0
 streamlit>=1.28.0
 
-# Visualization
+# GOOGLE SHEETS — Integração com planilha
+gspread>=6.0.0
+oauth2client>=4.1.3
+google-auth>=2.23.0
+google-auth-oauthlib>=1.0.0
+
+# DADOS — Processamento e análise
+pandas>=2.0.0
+numpy>=1.24.0
+python-dateutil>=2.8.0
+
+# FASE 1 — Cache Multinível
+redis>=5.0.0              # Cache Redis (usa memória se offline)
+
+# FASE 5 — IA Avançada
+groq>=0.11.0              # LLM via Groq API
+
+# FASE 6 — Relatórios Inteligentes
+openpyxl>=3.1.0           # Export Excel (.xlsx)
+fpdf2>=2.7.0              # Export PDF
+
+# VISUALIZAÇÃO
 plotly>=5.18.0
 
-# Cache & Performance
-redis>=5.0.0
-
-# Utilities
-python-dateutil>=2.8.0
+# UTILITÁRIOS
+python-dotenv>=1.0.0      # Variáveis de ambiente (.env)
 requests>=2.31.0
