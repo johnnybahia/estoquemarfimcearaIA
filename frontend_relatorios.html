@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Relatórios - Marfim Estoque</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 36px; margin-bottom: 8px; }
+        .header p { font-size: 16px; opacity: 0.9; }
+
+        /* Controles */
+        .controles { background: white; border-radius: 16px; padding: 20px 30px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .controles label { font-size: 13px; color: #666; font-weight: 500; }
+        .controles select, .controles input { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .controles select:focus, .controles input:focus { outline: none; border-color: #667eea; }
+
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; transform: translateY(-1px); }
+        .btn-success { background: #4CAF50; color: white; }
+        .btn-success:hover { background: #43a047; }
+        .btn-danger { background: #F44336; color: white; }
+        .btn-danger:hover { background: #e53935; }
+
+        /* KPIs */
+        .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .kpi { background: white; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .kpi .valor { font-size: 36px; font-weight: 700; color: #333; margin-bottom: 5px; }
+        .kpi .rotulo { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi.destaque { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .kpi.destaque .valor, .kpi.destaque .rotulo { color: white; }
+        .kpi.alerta { background: linear-gradient(135deg, #F44336, #C62828); }
+        .kpi.alerta .valor, .kpi.alerta .rotulo { color: white; }
+        .kpi.ok { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
+        .kpi.ok .valor, .kpi.ok .rotulo { color: white; }
+
+        /* Grid de gráficos */
+        .grid-graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; margin-bottom: 20px; }
+
+        .card { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .card-titulo { font-size: 17px; font-weight: 600; color: #333; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+        .card-titulo .icone { font-size: 22px; }
+
+        .chart-wrap { position: relative; height: 260px; }
+
+        /* Curva ABC */
+        .abc-badges { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .abc-badge { padding: 10px 20px; border-radius: 20px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+        .abc-badge.A { background: #E8F5E9; color: #2E7D32; border: 2px solid #4CAF50; }
+        .abc-badge.B { background: #FFF3E0; color: #E65100; border: 2px solid #FF9800; }
+        .abc-badge.C { background: #FFEBEE; color: #B71C1C; border: 2px solid #F44336; }
+        .abc-badge.active { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+
+        /* Tabela */
+        .tabela-wrap { overflow-x: auto; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead { background: #f5f5f5; }
+        th { padding: 12px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; border-bottom: 2px solid #e0e0e0; white-space: nowrap; }
+        td { padding: 11px 10px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover td { background: #fafafa; }
+
+        .badge-classe { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .badge-classe.A { background: #E8F5E9; color: #2E7D32; }
+        .badge-classe.B { background: #FFF3E0; color: #E65100; }
+        .badge-classe.C { background: #FFEBEE; color: #B71C1C; }
+
+        /* Barra de progresso */
+        .barra-prog { height: 6px; background: #e0e0e0; border-radius: 3px; }
+        .barra-fill { height: 100%; border-radius: 3px; }
+        .barra-fill.A { background: #4CAF50; }
+        .barra-fill.B { background: #FF9800; }
+        .barra-fill.C { background: #F44336; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 40px; color: #999; }
+        .spinner { display: inline-block; width: 40px; height: 40px; border: 4px solid #f0f0f0; border-top: 4px solid #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .grid-graficos { grid-template-columns: 1fr; }
+            .kpis { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Cabeçalho -->
+    <div class="header">
+        <h1>📊 Relatórios Inteligentes</h1>
+        <p>Curva ABC • Gráficos • Export Excel & PDF</p>
+    </div>
+
+    <!-- Controles -->
+    <div class="controles">
+        <div>
+            <label>Período</label><br>
+            <select id="selPeriodo" onchange="verificarPersonalizado()">
+                <option value="hoje">Hoje</option>
+                <option value="semana">Últimos 7 dias</option>
+                <option value="mes" selected>Últimos 30 dias</option>
+                <option value="trimestre">Trimestre (90 dias)</option>
+                <option value="personalizado">Personalizado</option>
+            </select>
+        </div>
+        <div id="blocoPersonalizado" style="display:none; display: flex; gap: 10px;">
+            <div><label>Data Início</label><br><input type="date" id="dataInicio"></div>
+            <div><label>Data Fim</label><br><input type="date" id="dataFim"></div>
+        </div>
+        <button class="btn btn-primary" onclick="carregarRelatorio()">📊 Gerar Relatório</button>
+        <button class="btn btn-success" onclick="exportarExcel()">📥 Excel</button>
+        <button class="btn btn-danger" onclick="exportarPdf()">📄 PDF</button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpis" id="kpiArea">
+        <div class="loading"><div class="spinner"></div><p>Carregando...</p></div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="grid-graficos">
+
+        <!-- Curva ABC (pizza) -->
+        <div class="card">
+            <div class="card-titulo"><span class="icone">🔤</span>Curva ABC</div>
+            <div class="chart-wrap"><canvas id="chartABC"></canvas></div>
+        </div>
+
+        <!-- Movimentações por dia (linha) -->
+        <div class="card">
+            <div class="card-titulo"><span class="icone">📈</span>Movimentações por Dia</div>
+            <div class="chart-wrap"><canvas id="chartMov"></canvas></div>
+        </div>
+
+        <!-- Grupos (barras) -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-titulo"><span class="icone">📦</span>Volume por Grupo</div>
+            <div class="chart-wrap" style="height: 300px;"><canvas id="chartGrupos"></canvas></div>
+        </div>
+
+    </div>
+
+    <!-- Tabela ABC -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-titulo"><span class="icone">📋</span>Detalhamento Curva ABC</div>
+        <div class="abc-badges">
+            <div class="abc-badge A active" onclick="filtrarABC('A')">🟢 Classe A — <span id="qtdA">0</span> itens</div>
+            <div class="abc-badge B" onclick="filtrarABC('B')">🟡 Classe B — <span id="qtdB">0</span> itens</div>
+            <div class="abc-badge C" onclick="filtrarABC('C')">🔴 Classe C — <span id="qtdC">0</span> itens</div>
+        </div>
+        <div class="tabela-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th><th>Item</th><th>Grupo</th><th>Classe</th>
+                        <th>Volume Total</th><th>Entradas</th><th>Saídas</th>
+                        <th>Saldo</th><th>% Volume</th><th>% Acum.</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaABC"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Itens Parados -->
+    <div class="card">
+        <div class="card-titulo"><span class="icone">⏸️</span>Itens Parados (30+ dias sem movimento)</div>
+        <div class="tabela-wrap">
+            <table>
+                <thead>
+                    <tr><th>#</th><th>Item</th><th>Grupo</th><th>Saldo</th><th>Dias Parado</th><th>Última Mov.</th><th>Status</th></tr>
+                </thead>
+                <tbody id="tabelaParados"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const API = 'http://localhost:5000/api';
+let dadosRelatorio = null;
+let classeAtiva = 'A';
+let chartABC = null, chartMov = null, chartGrupos = null;
+
+window.addEventListener('load', () => carregarRelatorio());
+
+function verificarPersonalizado() {
+    const p = document.getElementById('selPeriodo').value;
+    document.getElementById('blocoPersonalizado').style.display = p === 'personalizado' ? 'flex' : 'none';
+}
+
+async function carregarRelatorio() {
+    document.getElementById('kpiArea').innerHTML = '<div class="loading"><div class="spinner"></div><p>Gerando relatório...</p></div>';
+
+    try {
+        const periodo = document.getElementById('selPeriodo').value;
+        let url = `${API}/relatorios/completo?periodo=${periodo}`;
+
+        if (periodo === 'personalizado') {
+            const di = document.getElementById('dataInicio').value;
+            const df = document.getElementById('dataFim').value;
+            if (di && df) {
+                url += `&data_inicio=${converterData(di)}&data_fim=${converterData(df)}`;
+            }
+        }
+
+        const resp = await fetch(url);
+        dadosRelatorio = await resp.json();
+
+        renderizarKPIs(dadosRelatorio);
+        renderizarGraficos(dadosRelatorio);
+        renderizarTabelaABC(dadosRelatorio.curva_abc, 'A');
+        renderizarTabelaParados(dadosRelatorio.itens_parados);
+
+        document.getElementById('qtdA').textContent = (dadosRelatorio.curva_abc.A || []).length;
+        document.getElementById('qtdB').textContent = (dadosRelatorio.curva_abc.B || []).length;
+        document.getElementById('qtdC').textContent = (dadosRelatorio.curva_abc.C || []).length;
+
+    } catch (e) {
+        document.getElementById('kpiArea').innerHTML = `<div class="loading">❌ Erro: ${e.message}</div>`;
+    }
+}
+
+function renderizarKPIs(d) {
+    document.getElementById('kpiArea').innerHTML = `
+        <div class="kpi destaque"><div class="valor">${d.total_itens}</div><div class="rotulo">Total Itens</div></div>
+        <div class="kpi"><div class="valor">${d.total_grupos}</div><div class="rotulo">Grupos</div></div>
+        <div class="kpi ok"><div class="valor">${fmtNum(d.total_entradas)}</div><div class="rotulo">Entradas</div></div>
+        <div class="kpi alerta"><div class="valor">${fmtNum(d.total_saidas)}</div><div class="rotulo">Saídas</div></div>
+        <div class="kpi"><div class="valor">${d.total_movimentacoes}</div><div class="rotulo">Movimentações</div></div>
+        <div class="kpi ${d.itens_zerados > 0 ? 'alerta' : 'ok'}"><div class="valor">${d.itens_zerados}</div><div class="rotulo">Itens Zerados</div></div>
+        <div class="kpi ${d.itens_sem_movimento > 0 ? 'alerta' : 'ok'}"><div class="valor">${d.itens_sem_movimento}</div><div class="rotulo">Itens Parados</div></div>
+        <div class="kpi destaque"><div class="valor">${fmtNum(d.saldo_geral)}</div><div class="rotulo">Saldo Geral</div></div>
+    `;
+}
+
+function renderizarGraficos(d) {
+    // Destrói anteriores
+    [chartABC, chartMov, chartGrupos].forEach(c => c && c.destroy());
+
+    // Gráfico ABC (doughnut)
+    const abc = d.grafico_abc;
+    chartABC = new Chart(document.getElementById('chartABC'), {
+        type: 'doughnut',
+        data: {
+            labels: abc.labels,
+            datasets: [{ data: abc.data, backgroundColor: abc.colors, borderWidth: 0 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+
+    // Gráfico movimentações (linha)
+    const mov = d.grafico_movimentacoes;
+    chartMov = new Chart(document.getElementById('chartMov'), {
+        type: 'line',
+        data: {
+            labels: mov.labels,
+            datasets: mov.datasets.map(ds => ({
+                label: ds.label,
+                data: ds.data,
+                borderColor: ds.color,
+                backgroundColor: ds.color + '22',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 3
+            }))
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // Gráfico grupos (barras)
+    const grp = d.grafico_grupos;
+    chartGrupos = new Chart(document.getElementById('chartGrupos'), {
+        type: 'bar',
+        data: {
+            labels: grp.labels,
+            datasets: grp.datasets.map(ds => ({
+                label: ds.label,
+                data: ds.data,
+                backgroundColor: ds.color + 'cc',
+                borderColor: ds.color,
+                borderWidth: 1,
+                borderRadius: 6
+            }))
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+function filtrarABC(classe) {
+    classeAtiva = classe;
+    document.querySelectorAll('.abc-badge').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.abc-badge.${classe}`).classList.add('active');
+    if (dadosRelatorio) renderizarTabelaABC(dadosRelatorio.curva_abc, classe);
+}
+
+function renderizarTabelaABC(curva, classe) {
+    const itens = curva[classe] || [];
+    const tbody = document.getElementById('tabelaABC');
+
+    if (!itens.length) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#999;">Nenhum item nesta classe</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = itens.map((item, i) => `
+        <tr>
+            <td>${i + 1}</td>
+            <td style="font-weight:500">${item.item}</td>
+            <td style="color:#667eea;font-size:12px">${item.grupo}</td>
+            <td><span class="badge-classe ${item.classe}">${item.classe}</span></td>
+            <td style="text-align:right">${fmtNum(item.volume_total)}</td>
+            <td style="text-align:right;color:#4CAF50">${fmtNum(item.total_entradas)}</td>
+            <td style="text-align:right;color:#F44336">${fmtNum(item.total_saidas)}</td>
+            <td style="text-align:right;font-weight:600">${fmtNum(item.saldo)}</td>
+            <td>
+                <div style="font-size:12px;margin-bottom:3px">${item.percentual_volume.toFixed(1)}%</div>
+                <div class="barra-prog"><div class="barra-fill ${item.classe}" style="width:${Math.min(item.percentual_volume * 5, 100)}%"></div></div>
+            </td>
+            <td style="font-size:12px;color:#666">${item.percentual_acumulado.toFixed(1)}%</td>
+        </tr>
+    `).join('');
+}
+
+function renderizarTabelaParados(itens) {
+    const tbody = document.getElementById('tabelaParados');
+
+    if (!itens || !itens.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#4CAF50">✅ Nenhum item parado!</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = itens.map((item, i) => {
+        const cor = item.status === 'critico' ? '#F44336' : '#FF9800';
+        return `
+            <tr>
+                <td>${i + 1}</td>
+                <td style="font-weight:500">${item.item}</td>
+                <td style="color:#667eea;font-size:12px">${item.grupo}</td>
+                <td style="text-align:right">${fmtNum(item.saldo)}</td>
+                <td style="text-align:right;color:${cor};font-weight:600">${item.dias_sem_movimento} dias</td>
+                <td style="font-size:12px;color:#666">${item.ultima_movimentacao || 'N/A'}</td>
+                <td><span style="background:${cor}22;color:${cor};padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600">${item.status.toUpperCase()}</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function exportarExcel() {
+    const periodo = document.getElementById('selPeriodo').value;
+    window.open(`${API}/relatorios/exportar/excel?periodo=${periodo}`, '_blank');
+}
+
+async function exportarPdf() {
+    const periodo = document.getElementById('selPeriodo').value;
+    window.open(`${API}/relatorios/exportar/pdf?periodo=${periodo}`, '_blank');
+}
+
+function converterData(iso) {
+    const [a, m, d] = iso.split('-');
+    return `${d}/${m}/${a}`;
+}
+
+function fmtNum(n) {
+    if (n === undefined || n === null) return '0';
+    return Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+}
+</script>
+</body>
+</html>
