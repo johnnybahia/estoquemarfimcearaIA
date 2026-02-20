@@ -3405,8 +3405,10 @@
                     input.value = '';
                     // Recarregar listas
                     await atualizarListasDadosModal();
-                    // Reinicializar autocompletes
-                    initObservacaoAutocomplete();
+                    // Atualizar cache do autocomplete de OBS
+                    if (typeof AutoCompleteOBS !== 'undefined') {
+                        AutoCompleteOBS.refresh();
+                    }
                 } else {
                     alert('Erro: ' + data.error);
                 }
@@ -3603,5 +3605,8 @@
             }
         }
     </script>
+
+    <!-- AutoComplete para campos de OBS -->
+    <script src="autocomplete_obs.js"></script>
 </body>
 </html>
