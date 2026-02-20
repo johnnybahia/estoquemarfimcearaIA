@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Auditoria — Marfim Estoque</title>
+  <style>
+    /* ── Reset / Base ─────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ───────────────────────────────────── */
+    .page-header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.3);
+    }
+    .page-header h1 { font-size: 1.35rem; font-weight: 700; }
+    .page-header p  { font-size: .85rem; opacity: .75; margin-top: 2px; }
+
+    .container {
+      max-width: 1100px;
+      margin: 32px auto;
+      padding: 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Status Principal ─────────────────────────── */
+    .status-card {
+      border-radius: 16px;
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.1);
+      transition: all .4s ease;
+      background: #fff;
+      border-left: 8px solid #28a745;
+    }
+    .status-card.verde   { border-left-color: #28a745; }
+    .status-card.amarelo { border-left-color: #ffc107; background: #fffdf0; }
+    .status-card.laranja { border-left-color: #fd7e14; background: #fff8f0; }
+    .status-card.vermelho {
+      border-left-color: #dc3545;
+      background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+      animation: pulse-danger 2s infinite;
+    }
+    @keyframes pulse-danger {
+      0%, 100% { box-shadow: 0 4px 20px rgba(220,53,69,.15); }
+      50%       { box-shadow: 0 4px 35px rgba(220,53,69,.35); }
+    }
+
+    .status-emoji  { font-size: 3.5rem; flex-shrink: 0; }
+    .status-info   { flex: 1; }
+    .status-badge  {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .badge-verde   { background: #d4edda; color: #155724; }
+    .badge-amarelo { background: #fff3cd; color: #856404; }
+    .badge-laranja { background: #ffe5d0; color: #7d3a00; }
+    .badge-vermelho{ background: #f8d7da; color: #721c24; }
+
+    .status-msg-principal { font-size: 1.25rem; font-weight: 700; margin-bottom: 6px; }
+    .status-msg-detalhe   { font-size: .9rem;  color: #555; line-height: 1.55; }
+
+    .status-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* ── Contador regressivo ──────────────────────── */
+    .countdown {
+      text-align: center;
+      padding: 10px 18px;
+      border-radius: 12px;
+      background: rgba(0,0,0,.06);
+    }
+    .countdown .num {
+      font-size: 2.6rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .countdown .label { font-size: .75rem; opacity: .7; text-transform: uppercase; letter-spacing: .5px; }
+    .countdown.bloqueado .num { color: #dc3545; }
+    .countdown.urgente   .num { color: #fd7e14; }
+    .countdown.aviso     .num { color: #856404; }
+    .countdown.ok        .num { color: #28a745; }
+
+    .btn-refresh {
+      padding: 8px 18px;
+      border: none;
+      border-radius: 8px;
+      background: #1a1a2e;
+      color: #fff;
+      cursor: pointer;
+      font-size: .82rem;
+      font-weight: 600;
+      transition: background .2s;
+    }
+    .btn-refresh:hover { background: #0f3460; }
+
+    /* ── Grid de KPIs ─────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+    .kpi {
+      background: #fff;
+      border-radius: 12px;
+      padding: 18px 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .kpi .kpi-label { font-size: .78rem; color: #888; text-transform: uppercase; letter-spacing: .4px; }
+    .kpi .kpi-val   { font-size: 1.6rem; font-weight: 800; color: #1a1a2e; }
+    .kpi .kpi-sub   { font-size: .8rem;  color: #555; }
+
+    /* ── Histórico ────────────────────────────────── */
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 18px 24px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header h2 { font-size: 1rem; font-weight: 700; }
+    .card-body { padding: 0; }
+
+    table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+    th {
+      background: #f0f2f5;
+      padding: 12px 16px;
+      text-align: left;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: #666;
+      font-weight: 700;
+    }
+    td { padding: 11px 16px; border-bottom: 1px solid #f0f2f5; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbff; }
+    .dias-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 600;
+    }
+
+    /* ── Verificador de OBS ───────────────────────── */
+    .obs-checker {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .obs-checker input {
+      flex: 1;
+      min-width: 250px;
+      padding: 10px 14px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: .95rem;
+      transition: border-color .2s;
+    }
+    .obs-checker input:focus { outline: none; border-color: #0f3460; }
+    .obs-checker input.contem { border-color: #28a745; }
+    .obs-checker input.nao-contem { border-color: #ffc107; }
+    .obs-checker button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #0f3460;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .obs-result {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: .9rem;
+      font-weight: 500;
+      display: none;
+    }
+    .obs-result.ok  { background: #d4edda; color: #155724; display: block; }
+    .obs-result.nao { background: #fff3cd; color: #856404; display: block; }
+
+    /* ── Modal de Bloqueio ────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.65);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.ativo { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 520px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,.4);
+      text-align: center;
+      animation: slide-in .3s ease;
+    }
+    @keyframes slide-in {
+      from { transform: translateY(-30px); opacity: 0; }
+      to   { transform: translateY(0);     opacity: 1; }
+    }
+    .modal .icon { font-size: 4rem; margin-bottom: 16px; }
+    .modal h2 { font-size: 1.5rem; color: #dc3545; margin-bottom: 12px; }
+    .modal p  { color: #555; line-height: 1.6; margin-bottom: 20px; }
+    .modal ol {
+      text-align: left;
+      padding-left: 20px;
+      color: #333;
+      line-height: 1.8;
+      margin-bottom: 24px;
+    }
+    .modal .btn-fechar {
+      padding: 12px 32px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* ── Instruções ───────────────────────────────── */
+    .instrucoes {
+      background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
+      border: 1px solid #aed6f1;
+      border-radius: 14px;
+      padding: 24px 28px;
+    }
+    .instrucoes h3 { color: #1a5276; margin-bottom: 14px; font-size: 1rem; }
+    .instrucoes ol { padding-left: 20px; line-height: 2; color: #1a3a5c; }
+    .instrucoes code {
+      background: #1a1a2e;
+      color: #00f5a0;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: .9rem;
+    }
+
+    .loading { color: #888; font-style: italic; padding: 24px; text-align: center; }
+    .empty   { color: #aaa; padding: 24px; text-align: center; font-size: .9rem; }
+
+    @media (max-width: 640px) {
+      .status-card { flex-direction: column; align-items: flex-start; }
+      .status-meta  { align-items: flex-start; flex-direction: row; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Cabeçalho ──────────────────────────────────────────── -->
+<header class="page-header">
+  <div>
+    <h1>🔒 Controle de Auditoria Obrigatória</h1>
+    <p>Marfim Estoque Ceará — conferência periódica do estoque</p>
+  </div>
+</header>
+
+<!-- ── Modal de Bloqueio ──────────────────────────────────── -->
+<div class="modal-overlay" id="modalBloqueio">
+  <div class="modal">
+    <div class="icon">⛔</div>
+    <h2>Estoque Bloqueado</h2>
+    <p id="modalMensagem">O estoque está bloqueado por falta de conferência.</p>
+    <ol>
+      <li>Realize a conferência física do estoque</li>
+      <li>Corrija as divergências encontradas</li>
+      <li>Registre qualquer movimentação com a palavra<br>
+          <code>ATUALIZAÇÃO</code> no campo <strong>OBS</strong></li>
+    </ol>
+    <button class="btn-fechar" onclick="fecharModal()">Entendi — ir conferir</button>
+  </div>
+</div>
+
+<!-- ── Conteúdo ───────────────────────────────────────────── -->
+<main class="container">
+
+  <!-- Status Principal -->
+  <div class="status-card verde" id="statusCard">
+    <div class="status-emoji" id="statusEmoji">⏳</div>
+    <div class="status-info">
+      <span class="status-badge badge-verde" id="statusBadge">Carregando...</span>
+      <div class="status-msg-principal" id="statusMsg">Verificando situação da auditoria...</div>
+      <div class="status-msg-detalhe"  id="statusDetalhe">Aguarde enquanto consultamos o histórico.</div>
+    </div>
+    <div class="status-meta">
+      <div class="countdown ok" id="countdown">
+        <div class="num" id="countdownNum">–</div>
+        <div class="label">dias restantes</div>
+      </div>
+      <button class="btn-refresh" onclick="carregarStatus(true)">🔄 Atualizar</button>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <span class="kpi-label">Dias desde conferência</span>
+      <span class="kpi-val" id="kpiDias">–</span>
+      <span class="kpi-sub">Última ATUALIZAÇÃO</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Prazo limite</span>
+      <span class="kpi-val" id="kpiPrazo">–</span>
+      <span class="kpi-sub">20 dias após última conferência</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Última conferência</span>
+      <span class="kpi-val" id="kpiUltima" style="font-size:1.1rem">–</span>
+      <span class="kpi-sub" id="kpiUltimaItem">–</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Status do estoque</span>
+      <span class="kpi-val" id="kpiStatus" style="font-size:1.1rem">–</span>
+      <span class="kpi-sub" id="kpiStatusSub">–</span>
+    </div>
+  </div>
+
+  <!-- Verificador de OBS em tempo real -->
+  <div class="card">
+    <div class="card-header">
+      <h2>🔍 Verificador de OBS</h2>
+      <span style="font-size:.82rem;color:#888">Digite o texto antes de lançar</span>
+    </div>
+    <div class="card-body" style="padding:20px 24px">
+      <p style="font-size:.88rem;color:#555;margin-bottom:14px">
+        Para registrar uma conferência de estoque, o campo <strong>OBS</strong> deve conter a palavra
+        <code style="background:#1a1a2e;color:#00f5a0;padding:2px 8px;border-radius:4px">ATUALIZAÇÃO</code>.
+        Verifique abaixo antes de lançar.
+      </p>
+      <div class="obs-checker">
+        <input type="text" id="obsInput" placeholder="Digite o texto do campo OBS aqui..."
+               oninput="verificarObsTempoReal(this.value)">
+        <button onclick="verificarObs()">Verificar</button>
+      </div>
+      <div class="obs-result" id="obsResult"></div>
+    </div>
+  </div>
+
+  <!-- Histórico de Auditorias -->
+  <div class="card">
+    <div class="card-header">
+      <h2>📋 Histórico de Conferências</h2>
+      <span style="font-size:.82rem;color:#888">Últimas 10 atualizações registradas</span>
+    </div>
+    <div class="card-body">
+      <div id="historicoContainer">
+        <p class="loading">Carregando histórico...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instruções -->
+  <div class="instrucoes">
+    <h3>📌 Como funciona o controle de auditoria</h3>
+    <ol>
+      <li>A cada conferência física do estoque, registre uma movimentação (pode ser qualquer item)</li>
+      <li>No campo <strong>OBS</strong>, inclua obrigatoriamente a palavra <code>ATUALIZAÇÃO</code>
+          (com ou sem acento — o sistema aceita os dois)</li>
+      <li>O sistema registra a data dessa conferência e conta <strong>20 dias</strong></li>
+      <li>Aos 15 dias aparece um <strong>aviso amarelo</strong> — planeje a próxima conferência</li>
+      <li>Aos 18 dias aparece um <strong>alerta laranja urgente</strong></li>
+      <li>Ao completar 20 dias sem ATUALIZAÇÃO, todas as entradas e saídas são <strong>bloqueadas</strong></li>
+      <li>Para desbloquear: confira o estoque, corrija divergências e registre com OBS contendo ATUALIZAÇÃO</li>
+    </ol>
+  </div>
+
+</main>
+
+<script>
+// ── Estado ─────────────────────────────────────────────────
+let statusAtual = null;
+
+// ── Carregamento do status ──────────────────────────────────
+async function carregarStatus(forceRefresh = false) {
+  try {
+    const url = '/api/auditoria/status' + (forceRefresh ? '?force_refresh=true' : '');
+    const r = await fetch(url);
+    const data = await r.json();
+    if (data.success) {
+      statusAtual = data.auditoria;
+      renderizarStatus(data.auditoria);
+    }
+  } catch (e) {
+    console.error('Erro ao carregar status:', e);
+  }
+}
+
+async function carregarHistorico() {
+  try {
+    const r = await fetch('/api/auditoria/historico?limite=10');
+    const data = await r.json();
+    if (data.success) renderizarHistorico(data.historico);
+  } catch (e) {
+    document.getElementById('historicoContainer').innerHTML =
+      '<p class="empty">Erro ao carregar histórico.</p>';
+  }
+}
+
+// ── Renderização do status principal ───────────────────────
+function renderizarStatus(a) {
+  const card     = document.getElementById('statusCard');
+  const emoji    = document.getElementById('statusEmoji');
+  const badge    = document.getElementById('statusBadge');
+  const msg      = document.getElementById('statusMsg');
+  const detalhe  = document.getElementById('statusDetalhe');
+  const countdown= document.getElementById('countdown');
+  const countNum = document.getElementById('countdownNum');
+
+  // Limpa classes
+  card.className = 'status-card ' + a.nivel;
+  badge.className = 'status-badge badge-' + a.nivel;
+
+  emoji.textContent   = a.emoji;
+  badge.textContent   = a.nivel.toUpperCase();
+  msg.textContent     = a.mensagem;
+  detalhe.textContent = a.mensagem_detalhada;
+
+  // Countdown
+  countdown.className = 'countdown ' + ({
+    verde: 'ok', amarelo: 'aviso', laranja: 'urgente', vermelho: 'bloqueado'
+  }[a.nivel] || 'ok');
+
+  if (a.dias_para_bloqueio < 0) {
+    countNum.textContent = Math.abs(a.dias_para_bloqueio);
+    countdown.querySelector('.label').textContent = 'dias atrasado';
+  } else {
+    countNum.textContent = a.dias_para_bloqueio;
+    countdown.querySelector('.label').textContent = 'dias restantes';
+  }
+
+  // KPIs
+  document.getElementById('kpiDias').textContent    = a.dias_desde_ultima === 9999 ? '∞' : a.dias_desde_ultima + 'd';
+  document.getElementById('kpiPrazo').textContent   = a.proxima_auditoria_limite || '—';
+  document.getElementById('kpiUltima').textContent  = a.ultima_auditoria || 'Nunca';
+  document.getElementById('kpiUltimaItem').textContent = '';
+
+  const statusLabels = {
+    verde:    '✅ Liberado',
+    amarelo:  '⚠️ Aviso',
+    laranja:  '🚨 Urgente',
+    vermelho: '⛔ Bloqueado',
+  };
+  const statusSubs = {
+    verde:    'Operações permitidas',
+    amarelo:  'Confira em breve',
+    laranja:  'Confira hoje!',
+    vermelho: 'Sem movimentações',
+  };
+  document.getElementById('kpiStatus').textContent    = statusLabels[a.nivel] || a.nivel;
+  document.getElementById('kpiStatusSub').textContent = statusSubs[a.nivel] || '';
+
+  // Abre modal se bloqueado
+  if (!a.pode_movimentar) {
+    document.getElementById('modalMensagem').textContent = a.mensagem_detalhada;
+    document.getElementById('modalBloqueio').classList.add('ativo');
+  }
+}
+
+// ── Renderização do histórico ───────────────────────────────
+function renderizarHistorico(historico) {
+  const container = document.getElementById('historicoContainer');
+
+  if (!historico || historico.length === 0) {
+    container.innerHTML = '<p class="empty">Nenhuma conferência (ATUALIZAÇÃO) encontrada no histórico.</p>';
+    return;
+  }
+
+  const corDias = (dias) => {
+    if (dias <= 14) return '#d4edda;color:#155724';
+    if (dias <= 17) return '#fff3cd;color:#856404';
+    if (dias <= 19) return '#ffe5d0;color:#7d3a00';
+    return '#f8d7da;color:#721c24';
+  };
+
+  const rows = historico.map(h => `
+    <tr>
+      <td>${h.data}</td>
+      <td>${h.item || '—'}</td>
+      <td>${h.grupo || '—'}</td>
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+          title="${h.obs}">${h.obs}</td>
+      <td>${h.usuario || '—'}</td>
+      <td>
+        <span class="dias-badge" style="background:${corDias(h.dias_atras).split(';')[0]};${corDias(h.dias_atras).split(';')[1]}">
+          ${h.dias_atras}d atrás
+        </span>
+      </td>
+    </tr>
+  `).join('');
+
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Data / Hora</th>
+          <th>Item</th>
+          <th>Grupo</th>
+          <th>OBS</th>
+          <th>Usuário</th>
+          <th>Há quanto tempo</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+// ── Verificador de OBS ──────────────────────────────────────
+let _debounceTimer = null;
+
+function verificarObsTempoReal(texto) {
+  clearTimeout(_debounceTimer);
+  _debounceTimer = setTimeout(() => verificarObs(texto), 350);
+}
+
+async function verificarObs(texto) {
+  const input  = document.getElementById('obsInput');
+  const result = document.getElementById('obsResult');
+  const obs    = texto !== undefined ? texto : input.value;
+
+  if (!obs.trim()) {
+    result.className = 'obs-result';
+    input.className  = '';
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/auditoria/verificar-obs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ obs }),
+    });
+    const data = await r.json();
+
+    if (data.contem_auditoria) {
+      result.className   = 'obs-result ok';
+      input.className    = 'contem';
+    } else {
+      result.className   = 'obs-result nao';
+      input.className    = 'nao-contem';
+    }
+    result.textContent = data.mensagem;
+  } catch (e) {
+    result.className   = 'obs-result nao';
+    result.textContent = 'Erro ao verificar — tente novamente.';
+  }
+}
+
+// ── Modal ───────────────────────────────────────────────────
+function fecharModal() {
+  document.getElementById('modalBloqueio').classList.remove('ativo');
+}
+
+// ── Inicialização ───────────────────────────────────────────
+(async function init() {
+  await carregarStatus();
+  await carregarHistorico();
+
+  // Auto-refresh a cada 5 minutos
+  setInterval(() => carregarStatus(), 5 * 60 * 1000);
+})();
+
+// ── Integração com outros módulos ──────────────────────────
+// Disponibiliza globalmente para ser usado por outros scripts da página
+window.MarfimAuditoria = {
+  getStatus: () => statusAtual,
+  podeMovimentar: () => statusAtual ? statusAtual.pode_movimentar : true,
+  getNivel: () => statusAtual ? statusAtual.nivel : 'desconhecido',
+  mostrarBloqueio: () => document.getElementById('modalBloqueio').classList.add('ativo'),
+  refresh: () => carregarStatus(true),
+};
+</script>
+</body>
+</html>
