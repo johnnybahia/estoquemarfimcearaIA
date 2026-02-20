@@ -13,6 +13,15 @@ import os
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
+# Controle de Auditoria Obrigatória (FASE 9)
+try:
+    from auditoria_integration import register_auditoria_routes, requer_auditoria_valida
+    _AUDITORIA_DISPONIVEL = True
+except ImportError:
+    _AUDITORIA_DISPONIVEL = False
+    def requer_auditoria_valida(fn):          # fallback no-op
+        return fn
+
 # --- CONFIGURAÇÕES ---
 CHAVE_GROQ = os.getenv("GROQ_API_KEY", "")  # Configure aqui ou via variável de ambiente
 ARQUIVO_JSON = "credentials.json"
@@ -1033,6 +1042,7 @@ Qual item o usuário provavelmente quis digitar? Responda APENAS com o nome exat
 
 
 @app.route('/api/movimentacao', methods=['POST'])
+@requer_auditoria_valida
 def api_movimentacao():
     """Registra entrada ou saída de estoque"""
     try:
@@ -1612,6 +1622,12 @@ def api_debug():
             'error': str(e),
             'traceback': traceback.format_exc()
         })
+
+
+# ── Registrar rotas de Auditoria ────────────────────────────
+if _AUDITORIA_DISPONIVEL:
+    register_auditoria_routes(app)
+    print("[Auditoria] Controle de auditoria obrigatória ativo.")
 
 
 if __name__ == '__main__':
