@@ -26,6 +26,11 @@
   let cacheTimestamp = null;
   const CACHE_TTL_MS = 5 * 60 * 1000;  // 5 minutos
   const instancias = new Map();
+  const DEBUG = true;  // Ativar logs de debug
+
+  function log(...args) {
+    if (DEBUG) console.log('[AutoCompleteOBS]', ...args);
+  }
 
   // ─────────────────────────────────────────────────────────
   // Helpers
@@ -55,17 +60,21 @@
   async function carregarObservacoes(forceRefresh = false) {
     const agora = Date.now();
     if (!forceRefresh && cacheTimestamp && (agora - cacheTimestamp < CACHE_TTL_MS)) {
+      log(`Usando cache (${observacoesCache.length} observações)`);
       return observacoesCache;
     }
 
+    log('Carregando observações do servidor...');
     try {
       const response = await fetch('/api/dados-auxiliares');
       const data = await response.json();
       if (data.success && data.observacoes) {
         observacoesCache = data.observacoes;
         cacheTimestamp = agora;
+        log(`✅ Carregadas ${observacoesCache.length} observações:`, observacoesCache);
         return observacoesCache;
       }
+      log('⚠️ Resposta sem observações:', data);
       return [];
     } catch (e) {
       console.error('[AutoCompleteOBS] Erro ao carregar observações:', e);
@@ -92,6 +101,8 @@
         return;
       }
 
+      log(`Inicializando autocomplete para #${inputId}`);
+
       this.dropdown = null;
       this.items = [];
       this.selectedIndex = -1;
@@ -99,6 +110,7 @@
 
       this._criarDropdown();
       this._attachEventos();
+      log(`✅ Autocomplete #${inputId} inicializado com sucesso`);
     }
 
     _criarDropdown() {
@@ -116,21 +128,22 @@
 
       // Cria lista de sugestões
       this.dropdown = document.createElement('div');
-      this.dropdown.className = 'autocomplete-list';
+      this.dropdown.className = 'autocomplete-list autocomplete-obs-dropdown';
       this.dropdown.style.cssText = `
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border: 1px solid #ddd;
-        border-top: none;
-        border-radius: 0 0 8px 8px;
-        max-height: 280px;
-        overflow-y: auto;
-        z-index: 1050;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        display: none;
+        position: absolute !important;
+        top: 100% !important;
+        left: 0 !important;
+        right: 0 !important;
+        background: white !important;
+        border: 2px solid #0d6efd !important;
+        border-top: none !important;
+        border-radius: 0 0 8px 8px !important;
+        max-height: 280px !important;
+        overflow-y: auto !important;
+        z-index: 9999 !important;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important;
+        display: none !important;
+        margin-top: 0 !important;
       `;
       container.appendChild(this.dropdown);
     }
@@ -180,20 +193,25 @@
     }
 
     async _buscar(query) {
+      log(`Buscando observações para query: "${query}"`);
       const obs = await carregarObservacoes();
+      log(`Total de observações no cache: ${obs.length}`);
 
       // Filtrar com fuzzy match
       const filtrados = obs.filter(o => matchFuzzy(o, query));
+      log(`Encontradas ${filtrados.length} correspondências para "${query}"`);
 
       // Limita a 15 resultados
       this.items = filtrados.slice(0, 15);
       this.selectedIndex = -1;
 
       if (this.items.length === 0) {
+        log(`Nenhum resultado para "${query}" — fechando dropdown`);
         this._fechar();
         return;
       }
 
+      log(`Renderizando ${this.items.length} itens`);
       this._renderizar(query);
     }
 
@@ -247,6 +265,7 @@
       }
 
       this.dropdown.style.display = 'block';
+      log(`Dropdown exibido para #${this.inputId} (${this.items.length} itens + ${query && query.trim() && !this.items.includes(query.trim()) ? 1 : 0} novo)`);
     }
 
     _highlight(texto, query) {
@@ -373,16 +392,24 @@
 
   // Auto-inicialização ao carregar DOM
   document.addEventListener('DOMContentLoaded', function() {
+    log('DOMContentLoaded — procurando campos OBS para auto-inicialização...');
+
     // Procura automaticamente todos os inputs dentro de .autocomplete-container
     const containers = document.querySelectorAll('.autocomplete-container');
-    containers.forEach(container => {
-      const input = container.querySelector('input[type="text"]');
+    log(`Encontrados ${containers.length} containers com classe .autocomplete-container`);
+
+    containers.forEach((container, idx) => {
+      const input = container.querySelector('input[type="text"], input:not([type])');
       if (input && input.id) {
+        log(`  [${idx + 1}] Container → input#${input.id}`);
         window.AutoCompleteOBS.init(input.id);
+      } else {
+        log(`  [${idx + 1}] Container sem input válido (precisa ter id e type="text")`);
       }
     });
 
     // Pré-carrega observações
+    log('Pré-carregando observações...');
     window.AutoCompleteOBS.preload();
   });
 
