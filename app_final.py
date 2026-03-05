@@ -10,6 +10,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from groq import Groq
 import os
+import time
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
@@ -64,8 +65,21 @@ def encontrar_coluna(df, nomes_possiveis):
             return colunas_lower[nome.lower()]
     return None
 
-def carregar_dados_completos():
+# Cache em memória para dados do Google Sheets (TTL de 2 minutos)
+_cache_dados = {'df_idx': None, 'df_hist': None, 'timestamp': 0}
+_CACHE_TTL = 120  # segundos
+
+def invalidar_cache_dados():
+    """Invalida o cache após uma movimentação ser registrada"""
+    _cache_dados['timestamp'] = 0
+
+def carregar_dados_completos(forcar_reload=False):
     """Carrega índice e histórico com métricas calculadas"""
+    agora = time.time()
+    if not forcar_reload and _cache_dados['df_idx'] is not None:
+        if agora - _cache_dados['timestamp'] < _CACHE_TTL:
+            return _cache_dados['df_idx'], _cache_dados['df_hist']
+
     ss = conectar_google()
 
     # Índice de itens
@@ -196,16 +210,24 @@ def carregar_dados_completos():
     print(f"[DEBUG] Consumo total 30d: {df_idx['Consumo_30d'].sum():.0f}")
     print(f"[DEBUG] Itens com consumo: {(df_idx['Consumo_30d'] > 0).sum()}")
 
+    # Armazenar no cache
+    _cache_dados['df_idx'] = df_idx
+    _cache_dados['df_hist'] = df_hist
+    _cache_dados['timestamp'] = time.time()
+
     return df_idx, df_hist
 
-def consultar_ia(prompt, sistema="Você é um analista de estoque da Marfim Indústria Têxtil."):
+def consultar_ia(prompt, sistema="Você é um analista de estoque da Marfim Indústria Têxtil.", modelo_rapido=False):
     """Consulta a IA"""
     if not client_groq:
         return "⚠️ IA não configurada. Adicione CHAVE_GROQ no app_final.py"
 
+    # Usar modelo rápido (8B) para validações em tempo real; modelo completo (70B) para análises profundas
+    modelo = "llama-3.1-8b-instant" if modelo_rapido else "llama-3.3-70b-versatile"
+
     try:
         chat = client_groq.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=modelo,
             messages=[
                 {"role": "system", "content": sistema},
                 {"role": "user", "content": prompt}
@@ -931,7 +953,7 @@ Responda de forma MUITO CURTA e DIRETA:
 Use português brasileiro.
 """
 
-        resposta = consultar_ia(prompt, "Você é um validador de estoque. Seja direto e objetivo.")
+        resposta = consultar_ia(prompt, "Você é um validador de estoque. Seja direto e objetivo.", modelo_rapido=True)
 
         return jsonify({
             'success': True,
@@ -1187,6 +1209,10 @@ def api_movimentacao():
         # Resumo
         sucessos = sum(1 for r in resultados if r['sucesso'])
         erros = len(resultados) - sucessos
+
+        # Invalidar cache para que a próxima leitura reflita os novos saldos
+        if sucessos > 0:
+            invalidar_cache_dados()
 
         return jsonify({
             'success': True,
